@@ -137,8 +137,14 @@
   .gauge .g-mark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--faint); }
   .gauge .g-detail { display: none; font-size: 11.5px; color: var(--muted); margin-top: 7px; line-height: 1.5; }
   .gauge.open .g-detail { display: block; }
+  .gauge .g-cta { font-size: 11.5px; color: var(--warn-strong); font-weight: 600; margin-top: 6px; }
+  .gauge .g-cta:empty { display: none; }
+  .gauge .g-more { font-size: 10.5px; color: var(--faint); }
   .g-ok { color: var(--good-strong); } .g-warn { color: var(--warn-strong); } .g-bad { color: var(--danger-strong); }
+  .g-n { color: var(--muted); }
   .bg-ok { background: var(--good); } .bg-warn { background: var(--warn); } .bg-bad { background: var(--danger); }
+  .bg-n { background: var(--faint); }
+  .pill.n.q { border: 1px dashed var(--faint); }
 
   /* 다음 할 일 칩 */
   .next-chip { display: none; margin-top: 8px; width: 100%; text-align: left; -webkit-appearance: none;
@@ -147,7 +153,7 @@
     font-size: 12.5px; font-weight: 650; cursor: pointer; font-family: var(--font); }
   .next-chip.show { display: block; }
   .next-chip.urgent { border-color: color-mix(in srgb, var(--warn) 45%, transparent);
-    background: var(--warn-soft); color: var(--warn); }
+    background: var(--warn-soft); color: var(--warn-strong); }
 
   .alert { margin-top: 8px; background: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
     color: var(--danger-strong); border-radius: 11px; padding: 9px 12px; font-size: 13px; font-weight: 600;
@@ -163,7 +169,7 @@
     background: var(--surface); color: var(--ink); border-radius: 18px; height: 40px; padding: 0 13px;
     font-size: 13.5px; font-weight: 650; cursor: pointer; font-family: var(--font); position: relative; }
   .chip::after { content: ""; position: absolute; inset: -3px; }
-  .chip[aria-pressed="true"] { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+  .chip[aria-pressed="true"] { border-color: var(--warn); background: var(--warn-soft); color: var(--warn-strong); }
 
   /* compact header on scroll */
   body.compact .summary, body.compact .eyebrow, body.compact .gauge, body.compact .next-chip { display: none; }
@@ -255,6 +261,9 @@
   .item.on .txt { color: var(--muted); }
   .tagb { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 7px;
     background: var(--surface-2); color: var(--muted); margin-left: 5px; vertical-align: 1px; }
+  .item { position: relative; }
+  .item.with-note .item-row { padding-right: 40px; }
+  .item > .note-btn { position: absolute; top: 8px; right: 0; }
   .note-btn { flex-shrink: 0; -webkit-appearance: none; appearance: none; border: none; background: none;
     color: var(--faint); font-size: 15px; width: 34px; height: 34px; cursor: pointer; border-radius: 8px;
     display: grid; place-items: center; margin-top: -2px; position: relative; }
@@ -366,7 +375,8 @@
   .pill.d { background: var(--danger-soft); color: var(--danger-strong); }
   .pill.n { background: var(--surface-2); color: var(--muted); }
   .cmp-sub { margin-top: 5px; font-size: 11.5px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
-  .cmp-sub .fl { color: var(--danger); }
+  .cmp-sub .fl { color: var(--danger-strong); }
+  .cmp-sub .bd { color: var(--warn-strong); }
 
   .loading { text-align: center; color: var(--muted); font-size: 13px; padding: 40px 0; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
@@ -421,10 +431,10 @@
         </div>
       </div>
 
-      <div class="gauge" id="gauge" role="button" tabindex="0" aria-label="전세가율 상세 보기">
+      <div class="gauge" id="gauge" role="button" tabindex="0" aria-expanded="false" aria-label="전세가율 상세 보기">
         <div class="g-top">
           <span class="g-pct" id="gPct">—%</span>
-          <span class="g-lbl" id="gLbl">전세가율 (물린 돈 ÷ 시세)</span>
+          <span class="g-lbl" id="gLbl">전세가율 (물린 돈 ÷ 시세) <span class="g-more">상세 ▾</span></span>
           <span class="g-badge" id="gBadge"></span>
         </div>
         <div class="g-bar">
@@ -432,6 +442,7 @@
           <div class="g-mark" style="left:80%"></div>
           <div class="g-fill" id="gFill" style="width:0%"></div>
         </div>
+        <div class="g-cta" id="gCta"></div>
         <div class="g-detail" id="gDetail"></div>
       </div>
 
@@ -451,6 +462,7 @@
             <li><span class="k">4</span><span class="c"><b>잔금·입주 당일</b><span>아침에 등기부 재확인 → 잔금 → <b>그날 바로 전입신고+확정일자</b>.</span></span></li>
             <li><span class="k">5</span><span class="c"><b>입주 후</b><span>전세보증보험 가입, 서류 보관, 전입신고 유지.</span></span></li>
           </ol>
+          <button class="btn" id="coachBtn" style="margin-top:12px">✓✕ 체크 사용법 다시 보기</button>
         </div>
       </details>
 
@@ -507,6 +519,7 @@
             <button data-b="다세대">다세대(빌라)</button><button data-b="다가구">다가구</button>
             <button data-b="오피스텔">오피스텔</button><button data-b="아파트">아파트</button><button data-b="모름">모름</button>
           </div>
+          <div class="f-hint" style="margin-top:5px">다가구 = 집주인 1명이 건물 전체 소유(호수별 등기 없음 — 선순위 위험 큼) · 다세대(빌라) = 호수별 등기. 헷갈리면 '모름' — 중개사에게 물어보세요</div>
         </div>
         <div class="f-grid">
           <div class="f-cell"><label for="f_deposit">보증금</label><input id="f_deposit" data-f="deposit" type="text" inputmode="numeric" placeholder="20000"><div class="fmt" data-fmt="deposit"></div></div>
@@ -519,7 +532,7 @@
         <div class="f-src">
           <label>시세 출처 — 중요! (부풀린 시세는 위험을 가려요)</label>
           <div class="seg" id="segSrc" role="group" aria-label="시세 출처">
-            <button data-s="verified">✓ 안심전세앱·실거래가로 확인</button>
+            <button data-s="verified">안심전세앱·실거래가로 직접 확인함</button>
             <button data-s="told">중개사·광고가 말한 값</button>
             <button data-s="unknown">잘 모름</button>
           </div>
@@ -623,7 +636,7 @@
         ["리모델링 배관·전기까지? 도배·장판만?",{tag:"out"}],
         ["관리비 지난달 실제 얼마? 뭐 포함?",{h:"월 10만↑ 정액관리비는 세부내역 요구 가능",tag:"in",star:1}],
         ["옵션 고장 시 수리 책임은?",{tag:"in"}],
-        ["이 집 융자(근저당) 지금 얼마예요?",{h:"대략치라도 💰숫자에 넣으면 전세가율이 미리 보여요 (등기부로 확정)",tag:"in",star:1}],
+        ["이 집 융자(근저당) 지금 얼마예요?",{h:"대략치라도 답변에 적어두기 → 집에서 💰숫자에 입력하면 전세가율 계산 (등기부로 확정)",tag:"in",star:1}],
         ["근저당 계약 때까지 안 늘려주실 수 있나?",{tag:"kakao",star:1}],
         ["(다가구) 선순위 보증금 총액? 열람 가능?",{tag:"kakao"}]
       ]},
@@ -744,12 +757,21 @@
     tTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2000); }
   function flashToast(msg) { toastEl.textContent = msg || "저장됨"; toastEl.classList.add("show");
     clearTimeout(tTimer); tTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 900); }
-  function maybeCoach() {
-    try { if (localStorage.getItem("jib.coach")) return; localStorage.setItem("jib.coach", "1"); } catch (e) { return; }
+  function coachSheet() {
     openSheet('<h3>체크 사용법 — 탭 3단계</h3>' +
       '<p style="line-height:1.8">• <b>한 번 탭</b> = ✓ 양호(확인함)<br>• <b>두 번 탭</b> = ✕ 문제 (메모창이 자동으로 열려요)<br>• <b>세 번 탭</b> = 해제<br><br>🚩 위험신호·❓질문 칸은 한 번 탭으로 켜고 끕니다.</p>' +
       '<div class="actions"><button class="btn primary" id="coB">알겠어요</button></div>');
     var b = $("coB"); if (b) b.onclick = closeSheet;
+  }
+  function maybeCoach() {
+    try { if (localStorage.getItem("jib.coach")) return; localStorage.setItem("jib.coach", "1"); } catch (e) { return; }
+    coachSheet();
+  }
+  document.addEventListener("click", function (e) {
+    if (e.target && e.target.id === "coachBtn") { e.preventDefault(); coachSheet(); }
+  });
+  function normalizeProps(list) { /* 레거시 'ok' 값 → 1 통일 */
+    (list || []).forEach(function (p) { var c = p.checks || {}; for (var k in c) { if (c[k] === "ok") c[k] = 1; } });
   }
 
   /* ===== theme (persist) ===== */
@@ -771,7 +793,12 @@
   });
 
   /* ===== offline ===== */
-  function setOffline(off) { document.body.classList.toggle("off", off); }
+  function setOffline(off) {
+    var was = document.body.classList.contains("off");
+    document.body.classList.toggle("off", off);
+    if (off && !was) toast("📡 오프라인 — 체크는 기기에 저장, 연결되면 자동 동기화");
+    else if (!off && was) flashToast("다시 온라인 — 동기화 중");
+  }
   window.addEventListener("offline", function () { setOffline(true); });
   window.addEventListener("online", function () { setOffline(false); flushAll(); });
   setOffline(!navigator.onLine);
@@ -944,7 +971,7 @@
     if (inflight[pid]) return;
     var body = pending[pid]; if (!body) return;
     if (!state.uid || !navigator.onLine) return; /* online 이벤트가 재개 */
-    var snap = Object.assign({}, body);
+    var snap = JSON.parse(JSON.stringify(body)); /* 깊은 복사 — 전송 중 탭/메모가 살아있는 참조로 삼켜지지 않게 */
     inflight[pid] = 1;
     var send = Object.assign({}, snap); send.updated_at = new Date().toISOString();
     var r = await sb.from("properties").update(send).eq("id", pid).select("id");
@@ -981,6 +1008,7 @@
       try { cached = JSON.parse(localStorage.getItem("jib.cache." + state.uid) || "null"); } catch (e) {}
       if (cached && cached.length) {
         state.props = cached;
+        normalizeProps(state.props);
         state.props.forEach(function (p) { if (pending[p.id]) Object.assign(p, pending[p.id]); });
         if (!cur()) state.curId = cached[0].id;
         renderAll(); renderPhotos();
@@ -992,9 +1020,16 @@
       return;
     }
     state.props = r.data || [];
+    normalizeProps(state.props);
     state.props.forEach(function (p) { if (pending[p.id]) Object.assign(p, pending[p.id]); });
     cacheProps();
-    if (!state.props.length) { var np = await addProp("매물 1", true); if (np) askFirstName(); return; }
+    if (!state.props.length) {
+      var np = await addProp("매물 1", true);
+      if (np) { askFirstName(); return; }
+      $("sections").innerHTML = '<div class="loading">첫 매물 생성 실패 — 연결 확인 후<br><br><button class="btn" id="retryBtn" style="max-width:200px;margin:0 auto">다시 시도</button></div>';
+      $("retryBtn").addEventListener("click", loadProps);
+      return;
+    }
     if (!cur()) state.curId = state.props[0].id;
     renderAll();
     await loadPhotos();
@@ -1183,7 +1218,7 @@
     var reasons = [];
     if (!verified) reasons.push("price");
     if (!lienKnown) reasons.push("lien");
-    if (btype === "다가구" && !seniorKnown) reasons.push("senior");
+    if ((btype === "다가구" || btype === "모름" || btype === "") && !seniorKnown) reasons.push("senior");
     return { rate: rate, d: d, pr: pr, l: l, s: s, verified: verified, btype: btype,
       lienKnown: lienKnown, seniorKnown: seniorKnown, reasons: reasons };
   }
@@ -1191,27 +1226,33 @@
     var g = gaugeData(cur()), el = $("gauge");
     if (!g || fieldMode) { el.classList.remove("show"); return; }
     el.classList.add("show");
-    var incomplete = g.reasons.length > 0, cls, badgeTxt, badgeCls;
-    if (!g.verified) { cls = "warn"; badgeTxt = "시세 미확인 — 판정 보류"; badgeCls = "g-badge pill w"; }
-    else if (g.reasons.indexOf("lien") >= 0) { cls = "warn"; badgeTxt = "근저당 미확인 — 잠정"; badgeCls = "g-badge pill w"; }
-    else if (g.reasons.indexOf("senior") >= 0) { cls = "warn"; badgeTxt = "선순위 미확인 — 잠정"; badgeCls = "g-badge pill w"; }
-    else if (g.rate > 90) { cls = "bad"; badgeTxt = "보증보험 불가선 초과"; badgeCls = "g-badge pill d"; }
-    else if (g.rate > 80) { cls = "bad"; badgeTxt = "깡통 위험"; badgeCls = "g-badge pill d"; }
-    else if (g.rate > 70) { cls = "warn"; badgeTxt = "주의 구간"; badgeCls = "g-badge pill w"; }
-    else { cls = "ok"; badgeTxt = "안심 구간"; badgeCls = "g-badge pill g"; }
-    $("gPct").textContent = (incomplete ? "~" : "") + g.rate + "%";
+    var incomplete = g.reasons.length > 0, cls, badgeTxt, badgeCls, pctTxt, cta = "";
+    /* 안전 우선: 미확인값은 전부 낙관치(실제는 더 나쁠 수만 있음) → 낙관치가 이미 위험선이면 무조건 빨강 */
+    if (g.rate > 80) {
+      cls = "bad"; badgeCls = "g-badge pill d"; pctTxt = (incomplete ? "~" : "") + g.rate + "%";
+      badgeTxt = g.rate > 90 ? "보증보험 불가선 초과" : "깡통 위험";
+      if (incomplete) badgeTxt += " · 실제론 더 나쁠 수 있음";
+    } else if (incomplete) {
+      cls = "n"; badgeCls = "g-badge pill n q"; pctTxt = "?%";
+      if (!g.verified) { badgeTxt = "시세 확인 전 · 판단 불가"; cta = "→ 안심전세앱(HUG)에서 시세 확인 후, 아래 '시세 출처'를 바꾸면 판정이 켜져요"; }
+      else if (g.reasons.indexOf("lien") >= 0) { badgeTxt = "근저당 미확인 · 잠정"; cta = "→ 등기부 을구의 근저당을 입력하면 확정돼요 (없으면 0 입력)"; }
+      else { badgeTxt = "선순위 미확인 · 잠정"; cta = "→ 다가구(또는 유형 모름)는 선순위 보증금 확인 전엔 판정 불가"; }
+    } else if (g.rate > 70) { cls = "warn"; badgeCls = "g-badge pill w"; badgeTxt = "주의 구간"; pctTxt = g.rate + "%"; }
+    else { cls = "ok"; badgeCls = "g-badge pill g"; badgeTxt = "안심 구간"; pctTxt = g.rate + "%"; }
+    $("gPct").textContent = pctTxt;
     $("gPct").className = "g-pct g-" + cls;
     $("gFill").style.width = Math.min(g.rate, 100) + "%";
     $("gFill").className = "g-fill bg-" + cls;
     $("gBadge").textContent = badgeTxt; $("gBadge").className = badgeCls;
-    el.setAttribute("aria-label", "전세가율 약 " + g.rate + "퍼센트, " + badgeTxt + ", 눌러서 상세 보기");
+    $("gCta").textContent = cta;
+    el.setAttribute("aria-label", "전세가율 " + (incomplete ? "약 " : "") + g.rate + "퍼센트, " + badgeTxt + ", 눌러서 상세 보기");
     var lines = ["물린 돈 " + esc(manwon(g.d + g.l + g.s)) + " (보증금 " + esc(manwon(g.d)) +
       (g.l ? " + 근저당 " + esc(manwon(g.l)) : "") + (g.s ? " + 선순위 " + esc(manwon(g.s)) : "") +
-      ") ÷ 시세 " + esc(manwon(g.pr)) + " = <b>" + g.rate + "%</b>",
+      ") ÷ 시세 " + esc(manwon(g.pr)) + " = <b>" + (incomplete ? "약 " : "") + g.rate + "%</b>",
       "70%↓ 안심 · 70~80% 주의 · 80%↑ 깡통 위험"];
-    if (!g.verified) lines.push("⚠ 중개사가 부른 시세는 부풀려질 수 있어요 — <b>안심전세앱(HUG)</b>에서 확인하고 '시세 출처'를 확인으로 바꾸면 판정이 켜져요.");
-    if (g.reasons.indexOf("lien") >= 0) lines.push("⚠ 근저당을 아직 안 넣었어요 — 등기부(②) 떼서 채우면 확정돼요. (모르는데 0으로 넣으면 위험을 가립니다)");
-    if (g.reasons.indexOf("senior") >= 0) lines.push("⚠ 다가구인데 <b>선순위 보증금</b>이 비어 있어요 — 모르면 전세가율은 의미 없어요. 임대인이 열람 거부하면 그 자체가 위험신호.");
+    if (!g.verified) lines.push("⚠ 중개사가 부른 시세는 부풀려질 수 있어요 — <b>안심전세앱(HUG)</b>에서 확인하세요.");
+    if (g.reasons.indexOf("lien") >= 0) lines.push("⚠ 근저당 미입력 — 모르는데 0으로 넣으면 위험을 가립니다.");
+    if (g.reasons.indexOf("senior") >= 0) lines.push("⚠ 선순위 보증금 미확인 — 다가구는 이거 없인 전세가율이 의미 없어요. 임대인이 열람 거부하면 그 자체가 위험신호.");
     if (g.verified && !incomplete) {
       var extra = [];
       if (g.rate <= 90) extra.push("HUG 보증보험 가입 가능권(90%↓)");
@@ -1227,7 +1268,12 @@
     f[k] = (f[k] === v) ? "" : v;
     queueSaveFor(state.curId, { notes: c.notes });
     renderFactsSeg(); renderGauge();
-    if (k === "btype" && v === "오피스텔") { openSet["loan"] = true; }
+    if (k === "btype" && f[k] === "오피스텔") {
+      openSet["loan"] = true;
+      var lx = secEls["loan"];
+      if (lx) { lx.classList.add("open"); var lh = lx.querySelector(".sec-head"); if (lh) lh.setAttribute("aria-expanded", "true"); }
+      flashToast("오피스텔은 '주택용+전입가능' 확인이 필수예요 — ② 대출 섹션 확인");
+    }
   }
   function renderFactsSeg() {
     var f = factsOf(cur());
@@ -1291,13 +1337,18 @@
       secEls[sec.id] = wrap;
       var head = document.createElement("div");
       head.className = "sec-head"; head.setAttribute("role", "button"); head.tabIndex = 0;
+      head.setAttribute("aria-expanded", String(!!open));
       var cntCls = isFlag ? (done > 0 ? "cnt flagged" : "cnt") : (done === sec.items.length ? "cnt full" : "cnt");
       var cntTxt = isFlag ? (done > 0 ? done + " 발견" : "0")
         : done + "/" + sec.items.length + (bad ? " · ✕" + bad : "");
       head.innerHTML = '<span class="ic">' + sec.ic + '</span><span class="ttl">' + esc(sec.ttl) + '</span>' +
         '<span class="' + cntCls + '">' + cntTxt + '</span>' +
         '<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>';
-      head.addEventListener("click", function () { openSet[sec.id] = !wrap.classList.contains("open"); wrap.classList.toggle("open"); });
+      head.addEventListener("click", function () {
+        openSet[sec.id] = !wrap.classList.contains("open");
+        wrap.classList.toggle("open");
+        head.setAttribute("aria-expanded", String(wrap.classList.contains("open")));
+      });
       head.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); head.click(); } });
       wrap.appendChild(head);
       var body = document.createElement("div"); body.className = "sec-body";
@@ -1337,7 +1388,7 @@
             if (noteRow.firstChild && !noteRow.firstChild.value) { noteRow.innerHTML = ""; return; }
             ensureNote(true);
           });
-          row.appendChild(nb);
+          item.classList.add("with-note"); item.appendChild(nb); /* checkbox role 밖 (ARIA) */
           if (noteVal) ensureNote(false);
         }
         row.addEventListener("click", function (e) {
@@ -1401,16 +1452,16 @@
 
   /* ===== summary / next chip ===== */
   function statsOf(p, fieldOnly) {
-    var checks = (p && p.checks) || {}, done = 0, total = 0, flags = 0, bad = 0, flagNames = [];
+    var checks = (p && p.checks) || {}, done = 0, total = 0, flags = 0, bad = 0, flagNames = [], badNames = [];
     SECTIONS.forEach(function (sec) {
       if (fieldOnly && !sec.field) return;
       sec.items.forEach(function (it, i) {
         var v = checks[itemId(sec, i)];
         if (sec.type === "flag") { if (v) { flags++; flagNames.push(it[0]); } }
-        else { total++; if (v) done++; if (v === 2) bad++; }
+        else { total++; if (v) done++; if (v === 2) { bad++; badNames.push(it[0]); } }
       });
     });
-    return { done: done, total: total, flags: flags, bad: bad, flagNames: flagNames };
+    return { done: done, total: total, flags: flags, bad: bad, flagNames: flagNames, badNames: badNames };
   }
   var STAGE_META = [
     { key: "①", label: "① 집 보기", secs: ["com","sec","room","bath","kit","ask","re"], ic: "🏃" },
@@ -1503,7 +1554,9 @@
       var g = gaugeData(c);
       var warns = [];
       if (st.flags > 0) warns = warns.concat(st.flagNames.map(function (n) { return "🚩 " + n; }));
-      if (g && g.rate > 80) warns.push("📉 전세가율 " + g.rate + "% — 깡통 위험선 초과");
+      if (g && g.rate > 80) warns.push("📉 전세가율 " + (g.reasons.length ? "약 " : "") + g.rate + "% — 깡통 위험선 초과");
+      if (!g) warns.push("💰 보증금·시세 미입력 — 전세가율도 모른 채 후보 지정");
+      else if (!g.verified) warns.push("🔍 시세 미확인 — 안심전세앱(HUG)으로 확인 후 후보 권장");
       if (warns.length) {
         openSheet('<h3>⚠ 이 집, 그래도 후보로 할까요?</h3><p>다음 신호가 켜져 있어요:</p>' +
           '<ul class="flaglist">' + warns.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + '</ul>' +
@@ -1544,6 +1597,9 @@
   function openSheet(html) {
     sheetLastFocus = document.activeElement;
     sheet.innerHTML = html; sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-modal", "true");
+    var h3 = sheet.querySelector("h3");
+    if (h3) { h3.id = "sheetTitle"; sheet.setAttribute("aria-labelledby", "sheetTitle"); sheet.removeAttribute("aria-label"); }
+    else { sheet.setAttribute("aria-label", "대화상자"); sheet.removeAttribute("aria-labelledby"); }
     overlay.classList.add("show");
     var f = sheet.querySelector("input, textarea, button, [tabindex]");
     if (f) setTimeout(function () { try { f.focus(); } catch (e) {} }, 30);
@@ -1604,10 +1660,27 @@
   });
 
   /* ===== 비교 (결정 테이블) ===== */
+  function cmpSorted() {
+    var order = { "후보": 0, "보류": 1, "": 2, "탈락": 3 };
+    return state.props.slice().sort(function (a, b) {
+      var oa = order[a.rating] !== undefined ? order[a.rating] : 2;
+      var ob = order[b.rating] !== undefined ? order[b.rating] : 2;
+      if (oa !== ob) return oa - ob;
+      var ga = gaugeData(a), gb = gaugeData(b);
+      var ra = (ga && ga.verified && !ga.reasons.length) ? ga.rate : 999;
+      var rb = (gb && gb.verified && !gb.reasons.length) ? gb.rate : 999;
+      if (ra !== rb) return ra - rb;
+      return statsOf(a, false).flags - statsOf(b, false).flags;
+    });
+  }
   $("cmpBtn").addEventListener("click", function () {
+    var sorted = cmpSorted();
     var bestRate = null;
-    state.props.forEach(function (p) { var g = gaugeData(p); if (g && g.verified && !g.reasons.length && (bestRate === null || g.rate < bestRate)) bestRate = g.rate; });
-    var rows = state.props.map(function (p, i) {
+    sorted.forEach(function (p) {
+      var g = gaugeData(p);
+      if (g && g.verified && !g.reasons.length && statsOf(p, false).flags === 0 && (bestRate === null || g.rate < bestRate)) bestRate = g.rate;
+    });
+    var rows = sorted.map(function (p, i) {
       var st = statsOf(p, false), stf = statsOf(p, true);
       var g = gaugeData(p), f = factsOf(p);
       var rt = ratingIcon(p.rating) || "·";
@@ -1615,20 +1688,23 @@
       if (num(f.deposit)) pills += '<span class="pill n">' + esc(manwon(num(f.deposit))) + '</span>';
       if (g) {
         var vok = g.verified && !g.reasons.length;
-        var cls = !vok ? "n" : g.rate <= 70 ? "g" : g.rate <= 80 ? "w" : "d";
-        pills += '<span class="pill ' + cls + '">' + g.rate + "%" + (!vok ? "?" : "") + (vok && bestRate === g.rate && state.props.length > 1 ? " ✦" : "") + '</span>';
+        var cls = !vok ? "n q" : g.rate <= 70 ? "g" : g.rate <= 80 ? "w" : "d";
+        pills += '<span class="pill ' + cls + '">' + g.rate + "%" + (!vok ? " 미확인" : "") +
+          (vok && st.flags === 0 && bestRate === g.rate && state.props.length > 1 ? " ✦" : "") + '</span>';
       }
       pills += '<span class="pill ' + (st.flags ? "d" : "g") + '">⚠' + st.flags + '</span>';
       var sub = [];
-      sub.push("집보기 " + stf.done + "/" + stf.total + (st.bad ? " · ✕" + st.bad : ""));
+      sub.push("집보기 " + stf.done + "/" + stf.total);
+      if (st.badNames.length) sub.push('<span class="bd">✕ ' + esc(st.badNames.slice(0, 2).join(", ")) + (st.badNames.length > 2 ? " 외" + (st.badNames.length - 2) : "") + '</span>');
       if (st.flagNames.length) sub.push('<span class="fl">🚩 ' + esc(st.flagNames.slice(0, 2).join(", ")) + (st.flagNames.length > 2 ? " 외" : "") + '</span>');
       if (num(f.fee)) sub.push("관리비 " + num(f.fee) + "만");
+      if (num(f.area)) sub.push(num(f.area) + "㎡");
       return '<div class="cmp-card' + (p.id === state.curId ? " active" : "") + '" data-id="' + esc(p.id) + '">' +
         '<div class="cmp-top"><span class="rt">' + rt + '</span><span class="nm">' + esc(p.name || ("매물 " + (i + 1))) + '</span>' + pills + '</div>' +
         '<div class="cmp-sub">' + sub.join(" · ") + '</div></div>';
     }).join("");
     var hasCandidate = state.props.some(function (p) { return p.rating === "후보"; });
-    openSheet('<h3>매물 비교</h3><p>✦ = 검증된 시세 기준 전세가율 최저 · ?=시세 미확인 · 탭하면 그 매물로 이동</p><div class="cmp-list">' + rows + '</div>' +
+    openSheet('<h3>매물 비교</h3><p>좋은 순 정렬 · ✦=검증 시세 중 가장 안전(위험신호 0) · 점선 회색=시세 미확인 · 탭=이동</p><div class="cmp-list">' + rows + '</div>' +
       '<div class="actions" style="margin-top:14px">' +
       '<button class="btn" id="cB">닫기</button>' +
       (hasCandidate ? '<button class="btn primary" id="goRegB">👍 후보 → ② 등기부 확인 시작</button>' : '') +
@@ -1636,7 +1712,8 @@
     $("cB").onclick = closeSheet;
     if (hasCandidate) {
       $("goRegB").onclick = async function () {
-        var cand = state.props.filter(function (p) { return p.rating === "후보"; })[0];
+        var curP = cur();
+        var cand = (curP && curP.rating === "후보") ? curP : cmpSorted().filter(function (p) { return p.rating === "후보"; })[0];
         closeSheet();
         if (cand.id !== state.curId) { state.curId = cand.id; renderAll(); loadPhotos(); }
         if (fieldMode) { fieldMode = false; try { localStorage.setItem("jib.field", "0"); } catch (e) {} applyFieldMode(); }
