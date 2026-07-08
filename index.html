@@ -492,6 +492,7 @@
             <div><b>깡통전세</b> 집 팔아도 보증금 다 못 돌려주는 집(대출+보증금 &gt; 시세).</div>
             <div><b>방공제</b> 대출·보증 때 최우선변제금만큼 빼고 계산 → 한도가 줄어듦. 다가구가 특히 불리.</div>
             <div><b>전세보증보험(반환보증)</b> 집주인이 보증금 안 줘도 HUG/HF가 대신 돌려주는 보험. 내가 가입.</div>
+            <div><b>문제 생기면 연락처</b> 전세피해지원센터(HUG) <b>1533-8119</b> · 대한법률구조공단 무료상담 <b>132</b> · 이상 징후 느끼면 계약 전에 먼저 전화.</div>
             <div><b>특약</b> 계약서에 추가로 넣는 약속 문구. 내 안전장치.</div>
             <div><b>신탁</b> 집 소유권이 신탁회사에 넘어가 있는 상태. 등기부에 '신탁' 표시 — 집주인 마음대로 계약 못 하는 집. 초보는 피하는 게 답.</div>
             <div><b>가압류</b> 집주인 빚 때문에 법원이 집을 묶어둔 것. 등기부 갑구에 표시 — 있으면 거르기.</div>
@@ -1083,7 +1084,7 @@
   }
 
   /* ===== photos ===== */
-  var photosSeq = 0;
+  var photosSeq = 0, photosPid = null;
   function compressImage(file, maxDim, quality) {
     return new Promise(function (resolve, reject) {
       var url = URL.createObjectURL(file), img = new Image();
@@ -1105,8 +1106,9 @@
     var r = await sb.from("photos").select("*").eq("property_id", pid).order("created_at", { ascending: true });
     if (seq !== photosSeq) return;
     if (r.error) {
-      if (pid === state.curId && state.photos.length) { toast("사진 목록 새로고침 실패 — 이전 목록 유지"); return; }
-      state.photos = []; renderPhotos(); return;
+      /* 같은 매물 새로고침 실패면 유지, 다른 매물로 전환 중이면 비움(이전 집 사진 잔류 방지) */
+      if (pid === state.curId && photosPid === pid && state.photos.length) { toast("사진 목록 새로고침 실패 — 이전 목록 유지"); return; }
+      state.photos = []; photosPid = pid; renderPhotos(); return;
     }
     var list = r.data || [];
     list.forEach(function (x) { x.url = ""; });
@@ -1115,7 +1117,7 @@
       if (seq !== photosSeq) return;
       if (s.data) s.data.forEach(function (u, i) { if (list[i]) list[i].url = u.signedUrl || ""; });
     }
-    state.photos = list; photosLoadedAt = Date.now(); renderPhotos();
+    state.photos = list; photosPid = pid; photosLoadedAt = Date.now(); renderPhotos();
   }
   function renderPhotos() {
     var grid = $("phGrid"); grid.innerHTML = "";
@@ -1712,7 +1714,11 @@
       if (oa !== ob) return oa - ob;
       var ga = gaugeData(a), gb = gaugeData(b);
       /* 미확인은 뒤로, 단 '미확인+이미 위험선'은 그냥 미확인보다도 아래 */
-      function rk(g) { if (!g) return 999; if (g.verified && !g.reasons.length) return g.rate; return g.rate >= 80 ? 900 + g.rate : 500; }
+      function rk(g) { /* 좋은순: 검증안전 < 미확인 < 검증위험 < 미확인위험 < 숫자없음 */
+        if (!g) return 999;
+        if (g.verified && !g.reasons.length) return g.rate >= 80 ? 800 + g.rate : g.rate;
+        return g.rate >= 80 ? 900 + g.rate : 500;
+      }
       var ra = rk(ga), rb = rk(gb);
       if (ra !== rb) return ra - rb;
       return statsOf(a, false).flags - statsOf(b, false).flags;
@@ -1725,6 +1731,7 @@
       var g = gaugeData(p);
       if (g && g.verified && !g.reasons.length && statsOf(p, false).flags === 0 && (bestRate === null || g.rate < bestRate)) bestRate = g.rate;
     });
+    var crownGiven = false;
     var rows = sorted.map(function (p, i) {
       var st = statsOf(p, false), stf = statsOf(p, true);
       var g = gaugeData(p), f = factsOf(p);
@@ -1736,8 +1743,9 @@
         /* 게이지와 동일한 안전역전: 낙관치가 이미 80% 이상이면 미확인이어도 빨강 */
         var cls = g.rate >= 80 ? "d" : !vok ? "n q" : g.rate <= 70 ? "g" : "w";
         var ptxt = (!vok ? "≥" : "") + g.rate + "%" + (!vok ? (g.rate >= 80 ? " 미확인·위험" : " 미확인") : "");
-        pills += '<span class="pill ' + cls + '">' + ptxt +
-          (vok && st.flags === 0 && bestRate === g.rate && state.props.length > 1 ? " ✦" : "") + '</span>';
+        var crown = vok && st.flags === 0 && bestRate === g.rate && state.props.length > 1 && !crownGiven;
+        if (crown) crownGiven = true;
+        pills += '<span class="pill ' + cls + '">' + ptxt + (crown ? " ✦" : "") + '</span>';
       }
       pills += '<span class="pill ' + (st.flags ? "d" : "g") + '">⚠' + st.flags + '</span>';
       var sub = [];
