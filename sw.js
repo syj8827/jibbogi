@@ -1,5 +1,5 @@
 /* 집보기 체크앱 — 오프라인 셸 캐시. 배포 때마다 버전 올리면 자동 갱신됨 */
-var CACHE = "jib-v2";
+var CACHE = "jib-v3";
 var ASSETS = ["./", "./index.html", "./supabase.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function (e) {
