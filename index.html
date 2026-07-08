@@ -1,0 +1,921 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f5bd0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>집보기 체크앱</title>
+<style>
+  :root {
+    --bg: #f5f7fa; --surface: #ffffff; --surface-2: #eef1f6; --ink: #18202e;
+    --muted: #5a6474; --faint: #8a93a3; --border: #e0e5ec; --border-strong: #cfd6e0;
+    --accent: #2f5bd0; --accent-soft: #e7edfb; --good: #1f9d57; --good-soft: #e2f4ea;
+    --warn: #c8890b; --danger: #d43d3d; --danger-soft: #fbe8e8;
+    --shadow: 0 1px 2px rgba(24,32,46,.06), 0 8px 24px rgba(24,32,46,.06);
+    --radius: 14px; --tap: 46px;
+    --font: -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e131b; --surface: #161d28; --surface-2: #1e2733; --ink: #e7ebf2;
+      --muted: #9aa4b3; --faint: #6d7788; --border: #263041; --border-strong: #34404f;
+      --accent: #6f93f4; --accent-soft: #1c2942; --good: #35c07a; --good-soft: #14301f;
+      --warn: #e0a02a; --danger: #f2685f; --danger-soft: #351a1a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f7fa; --surface: #ffffff; --surface-2: #eef1f6; --ink: #18202e;
+    --muted: #5a6474; --faint: #8a93a3; --border: #e0e5ec; --border-strong: #cfd6e0;
+    --accent: #2f5bd0; --accent-soft: #e7edfb; --good: #1f9d57; --good-soft: #e2f4ea;
+    --warn: #c8890b; --danger: #d43d3d; --danger-soft: #fbe8e8;
+    --shadow: 0 1px 2px rgba(24,32,46,.06), 0 8px 24px rgba(24,32,46,.06);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e131b; --surface: #161d28; --surface-2: #1e2733; --ink: #e7ebf2;
+    --muted: #9aa4b3; --faint: #6d7788; --border: #263041; --border-strong: #34404f;
+    --accent: #6f93f4; --accent-soft: #1c2942; --good: #35c07a; --good-soft: #14301f;
+    --warn: #e0a02a; --danger: #f2685f; --danger-soft: #351a1a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--font);
+    -webkit-font-smoothing: antialiased; line-height: 1.45; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 0 14px calc(96px + env(safe-area-inset-bottom)); }
+
+  /* ---- auth ---- */
+  .auth { max-width: 400px; margin: 0 auto; padding: 10vh 18px 40px; }
+  .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+    padding: 26px 22px 22px; box-shadow: var(--shadow); }
+  .auth-brand { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+  .auth-sub { font-size: 13px; color: var(--muted); margin: 6px 0 18px; line-height: 1.5; }
+  .auth input { width: 100%; height: 48px; border: 1px solid var(--border-strong); border-radius: 12px;
+    background: var(--bg); color: var(--ink); padding: 0 14px; font-size: 16px; font-family: var(--font);
+    margin-bottom: 10px; }
+  .auth .actions { display: flex; gap: 8px; margin-top: 4px; }
+  .auth-msg { font-size: 12.5px; margin-top: 12px; min-height: 16px; color: var(--danger); line-height: 1.45; }
+  .auth-msg.ok { color: var(--good); }
+  .auth-hint { font-size: 11.5px; color: var(--faint); margin-top: 14px; line-height: 1.5; }
+
+  /* ---- sticky header ---- */
+  .topbar { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px);
+    border-bottom: 1px solid var(--border); margin: 0 -14px 14px; padding: 10px 14px 12px; }
+  .brand { display: flex; align-items: center; gap: 8px; }
+  .brand h1 { font-size: 15px; font-weight: 700; letter-spacing: -.01em; margin: 0; flex: 1; }
+  .eyebrow { font-size: 10.5px; color: var(--faint); margin-top: 3px; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; }
+  .icon-btn { -webkit-appearance: none; appearance: none; border: 1px solid var(--border-strong);
+    background: var(--surface); color: var(--ink); border-radius: 10px; height: 34px; min-width: 34px;
+    padding: 0 9px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex;
+    align-items: center; justify-content: center; gap: 5px; }
+  .icon-btn:active { transform: scale(.96); }
+  .icon-btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+  .offline { display: none; margin-top: 8px; background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--muted); border-radius: 10px; padding: 7px 11px; font-size: 12px; font-weight: 600; }
+  body.off .offline { display: block; }
+
+  .prop-row { display: flex; gap: 8px; align-items: stretch; margin-top: 10px; }
+  select.prop { flex: 1; min-width: 0; -webkit-appearance: none; appearance: none; background: var(--surface);
+    color: var(--ink); border: 1px solid var(--border-strong); border-radius: 11px; padding: 0 34px 0 13px;
+    height: var(--tap); font-size: 16px; font-weight: 650; font-family: var(--font);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%235a6474' stroke-width='2.2' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center; }
+
+  .summary { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-top: 10px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 8px 11px;
+    display: flex; flex-direction: column; gap: 1px; box-shadow: var(--shadow); }
+  .stat .num { font-family: var(--mono); font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em; }
+  .stat .lbl { font-size: 10.5px; color: var(--muted); letter-spacing: .02em; }
+  .stat.flag .num { color: var(--danger); }
+  .stat.flag.clear .num { color: var(--good); }
+  .stat.done .num { color: var(--accent); }
+  .rating { display: flex; gap: 4px; align-items: center; }
+  .rating button { -webkit-appearance: none; appearance: none; border: 1px solid var(--border);
+    background: var(--surface); border-radius: 10px; width: 40px; height: var(--tap); font-size: 19px;
+    cursor: pointer; opacity: .4; transition: opacity .15s, border-color .15s, background .15s; padding: 0; }
+  .rating button[aria-pressed="true"] { opacity: 1; border-color: var(--accent); background: var(--accent-soft); }
+
+  .alert { margin-top: 10px; background: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+    color: var(--danger); border-radius: 11px; padding: 9px 12px; font-size: 13px; font-weight: 600;
+    display: none; align-items: center; gap: 7px; }
+  .alert.show { display: flex; }
+
+  /* ---- photos ---- */
+  .photo-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 14px 14px; box-shadow: var(--shadow); margin-bottom: 10px; }
+  .ph-label { font-size: 12px; font-weight: 650; color: var(--muted); margin-bottom: 10px; display: block; }
+  .ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+  .ph-item { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--border); background: var(--surface-2); cursor: pointer; }
+  .ph-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ph-item .del { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%;
+    border: none; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; cursor: pointer;
+    display: grid; place-items: center; line-height: 1; }
+  .ph-add { aspect-ratio: 1; border: 2px dashed var(--border-strong); border-radius: 10px; background: transparent;
+    color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; display: flex;
+    flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-family: var(--font); }
+  .ph-add .plus { font-size: 22px; line-height: 1; color: var(--accent); }
+  .ph-busy { font-size: 12px; color: var(--faint); padding: 6px 0; }
+
+  /* ---- sections ---- */
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 10px; box-shadow: var(--shadow); overflow: hidden; }
+  .sec-head { display: flex; align-items: center; gap: 10px; padding: 13px 14px; cursor: pointer;
+    -webkit-tap-highlight-color: transparent; user-select: none; }
+  .sec-head .ic { font-size: 17px; line-height: 1; }
+  .sec-head .ttl { flex: 1; font-size: 14.5px; font-weight: 680; letter-spacing: -.01em; }
+  .sec-head .cnt { font-family: var(--mono); font-size: 11.5px; font-weight: 600; color: var(--muted);
+    font-variant-numeric: tabular-nums; background: var(--surface-2); border-radius: 20px; padding: 3px 9px; }
+  .sec-head .cnt.full { color: var(--good); }
+  .sec-head .cnt.flagged { color: var(--danger); }
+  .sec-head .chev { color: var(--faint); transition: transform .2s ease; flex-shrink: 0; }
+  .section.open .chev { transform: rotate(180deg); }
+  .sec-body { display: none; padding: 2px 14px 8px; }
+  .section.open .sec-body { display: block; }
+  .sec-note { font-size: 12px; color: var(--muted); padding: 0 0 8px; border-top: 1px dashed var(--border);
+    margin-top: 2px; padding-top: 9px; }
+
+  .item { border-top: 1px solid var(--border); padding: 3px 2px; }
+  .item:first-child { border-top: none; }
+  .item-row { display: flex; align-items: flex-start; gap: 11px; padding: 8px 0; min-height: var(--tap);
+    cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .box { flex-shrink: 0; width: 23px; height: 23px; border-radius: 7px; border: 2px solid var(--border-strong);
+    margin-top: 1px; display: grid; place-items: center; transition: background .15s, border-color .15s; }
+  .box svg { width: 15px; height: 15px; stroke: #fff; stroke-width: 3.2; fill: none; opacity: 0;
+    transition: opacity .12s; }
+  .item.on .box { background: var(--good); border-color: var(--good); }
+  .item.on .box svg { opacity: 1; }
+  .item .txt { flex: 1; font-size: 14px; font-weight: 550; letter-spacing: -.01em; }
+  .item .txt .hint { display: block; font-size: 11.5px; font-weight: 450; color: var(--faint); margin-top: 2px; }
+  .item.on .txt { color: var(--muted); }
+  .note-btn { flex-shrink: 0; -webkit-appearance: none; appearance: none; border: none; background: none;
+    color: var(--faint); font-size: 15px; width: 32px; height: 32px; cursor: pointer; border-radius: 8px;
+    display: grid; place-items: center; margin-top: -3px; }
+  .note-btn.has { color: var(--accent); }
+  .note-row { padding: 0 0 9px 34px; }
+  .note-in { width: 100%; border: 1px solid var(--border); border-radius: 9px; background: var(--bg);
+    color: var(--ink); padding: 8px 11px; font-family: var(--font); font-size: 16px; line-height: 1.4;
+    resize: none; min-height: 38px; }
+  .note-in::placeholder { color: var(--faint); font-size: 13px; }
+
+  .item.flag .box { border-radius: 50%; border-color: color-mix(in srgb, var(--danger) 55%, var(--border-strong)); }
+  .item.flag.on .box { background: var(--danger); border-color: var(--danger); }
+  .item.flag.on { background: var(--danger-soft); border-radius: 9px; }
+  .item.flag.on .txt { color: var(--danger); font-weight: 650; }
+
+  .memo-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 14px 14px; box-shadow: var(--shadow); margin-bottom: 10px; }
+  .memo-wrap label { font-size: 12px; font-weight: 650; color: var(--muted); display: block; margin-bottom: 7px; }
+  textarea.memo { width: 100%; min-height: 76px; resize: vertical; background: var(--bg); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-family: var(--font);
+    font-size: 16px; line-height: 1.5; }
+  textarea.memo::placeholder { color: var(--faint); font-size: 13px; }
+
+  .info { background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; }
+  .info .info-body { padding: 0 14px 12px; }
+  .info ul { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .info li { font-size: 12.7px; color: var(--ink); padding-left: 14px; position: relative; line-height: 1.45; }
+  .info li::before { content: ""; position: absolute; left: 2px; top: 8px; width: 5px; height: 5px;
+    border-radius: 50%; background: var(--accent); }
+  .info li b { font-family: var(--mono); font-weight: 700; }
+  .info li.warn { color: var(--warn); } .info li.warn::before { background: var(--warn); }
+  details.info > summary { list-style: none; cursor: pointer; padding: 13px 14px; font-size: 14px;
+    font-weight: 680; color: var(--accent); display: flex; align-items: center; gap: 8px;
+    -webkit-tap-highlight-color: transparent; }
+  details.info > summary::-webkit-details-marker { display: none; }
+  details.info > summary .sm { margin-left: auto; font-size: 11px; color: var(--faint); font-weight: 500; }
+  details.info .info-body { padding: 0 14px 13px; }
+  details.info.plain { background: var(--surface); border-color: var(--border); }
+  details.info.plain > summary { color: var(--ink); }
+  details.info.plain > summary .sm { color: var(--faint); }
+  body.field details.info { display: none; }
+  body.field .actions.bottom { display: none; }
+
+  .stage { display: flex; align-items: center; gap: 10px; margin: 20px 2px 9px; }
+  .stage:first-child { margin-top: 4px; }
+  .stage .t { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--accent); white-space: nowrap; }
+  .stage.risk .t { color: var(--danger); }
+  .stage .ln { flex: 1; height: 1px; background: var(--border); }
+
+  .road { margin: 8px 0 2px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 11px; }
+  .road li { display: flex; gap: 11px; align-items: flex-start; }
+  .road .k { flex-shrink: 0; width: 25px; height: 25px; border-radius: 50%; background: var(--accent);
+    color: #fff; font-family: var(--mono); font-weight: 700; font-size: 12.5px; display: grid; place-items: center; }
+  .road .c b { font-size: 13.5px; }
+  .road .c span { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; line-height: 1.45; }
+  .gloss { margin: 8px 0 2px; display: flex; flex-direction: column; gap: 10px; }
+  .gloss div { font-size: 12.7px; line-height: 1.5; color: var(--ink); }
+  .gloss b { color: var(--accent); font-weight: 700; }
+
+  .actions { display: flex; gap: 8px; margin-top: 4px; }
+  .btn { flex: 1; -webkit-appearance: none; appearance: none; border: 1px solid var(--border-strong);
+    background: var(--surface); color: var(--ink); border-radius: 12px; height: 46px; font-size: 14px;
+    font-weight: 620; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font-family: var(--font); }
+  .btn:active { transform: scale(.98); }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border-strong)); }
+
+  .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translate(-50%, 14px);
+    background: var(--ink); color: var(--bg); font-size: 13px; font-weight: 600; padding: 9px 16px;
+    border-radius: 22px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 60;
+    max-width: 88vw; text-align: center; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  .overlay { position: fixed; inset: 0; background: rgba(10,14,20,.55); display: none; z-index: 50;
+    align-items: flex-end; justify-content: center; padding: 0; }
+  .overlay.show { display: flex; }
+  @media (min-width: 560px) { .overlay { align-items: center; padding: 20px; } }
+  .sheet { background: var(--surface); width: 100%; max-width: 560px; border-radius: 18px 18px 0 0;
+    padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); box-shadow: 0 -8px 40px rgba(0,0,0,.3);
+    animation: rise .22s ease; max-height: 88vh; overflow: auto; }
+  @media (min-width: 560px) { .sheet { border-radius: 18px; } }
+  @keyframes rise { from { transform: translateY(24px); opacity: .4; } to { transform: none; opacity: 1; } }
+  .sheet h3 { margin: 0 0 4px; font-size: 16px; }
+  .sheet p { margin: 0 0 14px; font-size: 12.5px; color: var(--muted); }
+  .sheet input { width: 100%; height: 46px; border: 1px solid var(--border-strong); border-radius: 11px;
+    background: var(--bg); color: var(--ink); padding: 0 13px; font-size: 16px; font-family: var(--font);
+    margin-bottom: 12px; }
+  .lightbox { display: block; width: 100%; border-radius: 12px; }
+
+  .cmp-list { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
+  .cmp-card { border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; background: var(--bg);
+    display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .cmp-card.active { border-color: var(--accent); background: var(--accent-soft); }
+  .cmp-card .nm { flex: 1; font-size: 14px; font-weight: 650; min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .cmp-card .rt { font-size: 17px; }
+  .cmp-card .pill { font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 7px;
+    font-variant-numeric: tabular-nums; }
+  .pill.g { background: var(--good-soft); color: var(--good); }
+  .pill.d { background: var(--danger-soft); color: var(--danger); }
+
+  .loading { text-align: center; color: var(--muted); font-size: 13px; padding: 40px 0; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<!-- ===== 로그인 화면 ===== -->
+<div id="authView" class="auth" style="display:none">
+  <div class="auth-card">
+    <div class="auth-brand">🏠 집보기 체크앱</div>
+    <p class="auth-sub">로그인하면 폰·PC 어디서나 <b>같은 매물·사진·기록</b>이 뜹니다. 처음이면 이메일·비밀번호 넣고 <b>가입</b>을 누르세요.</p>
+    <input id="email" type="email" placeholder="이메일" autocomplete="username" inputmode="email">
+    <input id="pw" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="current-password">
+    <div class="actions">
+      <button class="btn primary" id="loginBtn">로그인</button>
+      <button class="btn" id="signupBtn">가입</button>
+    </div>
+    <div class="auth-msg" id="authMsg"></div>
+    <div class="auth-hint">내 데이터는 나만 볼 수 있어요(로그인 필요). 비밀번호는 남에게 알려주지 마세요.</div>
+  </div>
+</div>
+
+<!-- ===== 앱 화면 ===== -->
+<div id="appView" style="display:none">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <span style="font-size:19px">🏠</span>
+        <h1>집보기 체크앱</h1>
+        <button class="icon-btn" id="fieldBtn" title="현장 모드 — 집볼때+위험신호만" aria-pressed="false">🏃 현장</button>
+        <button class="icon-btn" id="themeBtn" title="테마" aria-label="테마 전환">◐</button>
+        <button class="icon-btn" id="logoutBtn" title="로그아웃" aria-label="로그아웃">↩</button>
+      </div>
+      <div class="eyebrow" id="userLabel">동기화됨 · 매물마다 저장</div>
+      <div class="offline">📡 오프라인 — 화면은 뜨지만 저장·사진은 연결 후 됩니다</div>
+
+      <div class="prop-row">
+        <select class="prop" id="propSel" aria-label="매물 선택"></select>
+        <button class="icon-btn" id="addBtn" aria-label="새 매물">＋ 매물</button>
+        <button class="icon-btn" id="cmpBtn" aria-label="매물 비교">⇄ 비교</button>
+      </div>
+
+      <div class="summary">
+        <div class="stat done"><span class="num" id="sDone">0/0</span><span class="lbl">확인 완료</span></div>
+        <div class="stat flag" id="sFlagWrap"><span class="num" id="sFlag">0</span><span class="lbl">위험신호 발견</span></div>
+        <div class="rating" id="rating" role="group" aria-label="매물 판정">
+          <button data-r="후보" title="후보" aria-pressed="false">👍</button>
+          <button data-r="보류" title="보류" aria-pressed="false">🤔</button>
+          <button data-r="탈락" title="탈락" aria-pressed="false">👎</button>
+        </div>
+      </div>
+      <div class="alert" id="alert"><span>⚠️</span><span id="alertTxt"></span></div>
+    </div>
+
+    <div id="appBody">
+      <details class="info plain">
+        <summary>🗺 전세 전체 흐름 — 처음이면 이 순서<span class="sm">5단계</span></summary>
+        <div class="info-body">
+          <ol class="road">
+            <li><span class="k">1</span><span class="c"><b>집 보기</b><span>여러 집 보고 아래 체크로 비교. 급하지 않게, 후보는 시간대 바꿔 두 번.</span></span></li>
+            <li><span class="k">2</span><span class="c"><b>계약 전 확인</b><span>등기부·건축물대장·(다가구면)선순위 보증금 확인. 대출·보증보험 되는 집인지.</span></span></li>
+            <li><span class="k">3</span><span class="c"><b>계약</b><span>소유자 본인과, 소유자 계좌로 계약금. 특약 넣고 서류 받기.</span></span></li>
+            <li><span class="k">4</span><span class="c"><b>잔금·입주 당일</b><span>아침에 등기부 재확인 → 잔금 → <b>그날 바로 전입신고+확정일자</b>. 제일 중요.</span></span></li>
+            <li><span class="k">5</span><span class="c"><b>입주 후</b><span>전세보증보험 가입, 서류 보관, 전입신고 유지.</span></span></li>
+          </ol>
+        </div>
+      </details>
+
+      <details class="info plain">
+        <summary>📖 쉬운 용어사전 — 모르는 말 여기서<span class="sm">탭</span></summary>
+        <div class="info-body">
+          <div class="gloss">
+            <div><b>전세</b> 큰 보증금 맡기고 월세 없이 사는 것. 나갈 때 보증금 그대로 돌려받음.</div>
+            <div><b>등기부등본</b> 그 집의 '신분증+빚 명세서'. 주인이 누구고 대출(근저당)이 얼마인지 나옴. 인터넷등기소 700원.</div>
+            <div><b>근저당</b> 집주인이 그 집을 담보로 받은 대출. 경매 가면 나보다 먼저 돈 가져감. 클수록 위험.</div>
+            <div><b>채권최고액</b> 근저당의 최대 한도액(보통 실제 대출의 110~120%로 잡힘).</div>
+            <div><b>선순위 보증금</b> 나보다 먼저 들어온 세입자들의 보증금. 나보다 먼저 돌려받음. 다가구에서 특히 중요.</div>
+            <div><b>대항력</b> '나 여기 세입자야'라고 버틸 수 있는 힘. <b>전입신고+이사(점유)</b> 하면 다음날 0시부터 생김.</div>
+            <div><b>확정일자</b> 계약서에 날짜 도장 받는 것. 경매 시 <b>돈 돌려받는 순번</b>이 생김. 계약서만 있으면 <b>미리 받아둬도</b> 됨(빠를수록 안전).</div>
+            <div><b>당해세</b> 그 집에 매겨진 세금(재산세 등). 집주인이 체납하면 내 보증금보다 <b>먼저</b> 가져감 → 계약 전 미납 확인 필수.</div>
+            <div><b>임차권등기명령</b> 만기에 보증금 못 받았을 때 신청. 등기되면 <b>이사 나가도 대항력·순번 유지</b>.</div>
+            <div><b>우선변제권</b> 대항력+확정일자 = 경매 가도 내 순번에 보증금 받을 권리.</div>
+            <div><b>최우선변제</b> 보증금이 작은 세입자(서울 1억6,500만↓)는 경매 시 <b>최대 5,500만원을 가장 먼저</b> 돌려받는 안전망. 보증금이 크면 해당 없음.</div>
+            <div><b>계약갱신청구권</b> 세입자가 원하면 <b>한 번 더 2년(2+2)</b> 살 수 있는 권리. 재계약 인상은 <b>5% 상한</b>. 만기 6~2개월 전에 행사.</div>
+            <div><b>전입신고</b> 주민센터/정부24에 '나 여기 산다' 신고. 이사 당일 필수.</div>
+            <div><b>깡통전세</b> 집 팔아도 보증금 다 못 돌려주는 집(대출+보증금 &gt; 시세).</div>
+            <div><b>방공제</b> 대출·보증 때 최우선변제금만큼 빼고 계산 → 한도가 줄어듦. 다가구가 특히 불리.</div>
+            <div><b>전세보증보험(반환보증)</b> 집주인이 보증금 안 줘도 HUG/HF가 대신 돌려주는 보험. 내가 가입.</div>
+            <div><b>특약</b> 계약서에 추가로 넣는 약속 문구. 내 안전장치.</div>
+          </div>
+        </div>
+      </details>
+
+      <details class="info">
+        <summary>💳 청년 전세대출 요약<span class="sm">탭해서 펼치기</span></summary>
+        <div class="info-body">
+          <ul>
+            <li><b>카카오뱅크 청년</b> · 보증금 90% / 최대 2억 · 만19~34세·소득 7천↓·무주택 · 금리 3%대</li>
+            <li><b>청년버팀목</b> · 최대 2억 수준(개정 잦음 — 기금e든든에서 확인) · 금리 2%대 · 만19~34세·무주택 <b>(중기청은 2024년말 종료 → 여기로 통합)</b></li>
+            <li><b>방공제</b> 서울 방1당 5,500만 공제 → 다가구는 방 수만큼 한도↓ (다세대가 유리)</li>
+            <li class="warn">수도권은 6.27대책(2025.7)으로 보증비율 80%·한도 축소 + 매매연계(소유권이전 조건부) 전세대출 금지 — 지역·시점별 상이, 신청 시 재확인</li>
+          </ul>
+        </div>
+      </details>
+
+      <div class="photo-wrap">
+        <span class="ph-label">📷 이 집 사진 — 탭해서 크게 · 폰↔PC 자동 동기화</span>
+        <div class="ph-grid" id="phGrid"></div>
+        <input type="file" id="phInput" accept="image/*" multiple style="display:none">
+      </div>
+
+      <div id="sections"></div>
+
+      <div class="memo-wrap">
+        <label for="memo">📝 이 집 종합 메모 (관리비·집주인 인상·특이사항)</label>
+        <textarea class="memo" id="memo" placeholder="예) 관리비 실제 7만(수도포함), 2층 여름 더움, 근저당 5천 — 잔금 시 말소 특약 요청…"></textarea>
+      </div>
+
+      <div class="actions bottom">
+        <button class="btn" id="resetBtn">↺ 이 매물 체크 초기화</button>
+        <button class="btn danger" id="delBtn">🗑 매물 삭제</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">저장됨</div>
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+
+<script src="supabase.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ===== CONFIG ===== */
+  var SUPABASE_URL = "https://oxunxngfrrrqwvdvgjcl.supabase.co";
+  var SUPABASE_KEY = "sb_publishable_PVdIyOtPmRkUzGjBcx7A8w_NEtY5eev";
+  var BUCKET = "property-photos";
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  /* ===== 체크리스트 ===== */
+  var SECTIONS = [
+    { id:"sec", stage:"① 집 볼 때", field:true, ic:"🚪", ttl:"현관·방범", type:"check",
+      note:"1인가구·여성일수록 침입 경로를 도둑 시선으로 보세요.",
+      items:[["도어락 교체·비번 변경 가능","전 세입자가 비번 알 수 있음"],["하단 보조키(이중잠금) 설치 가능",""],["창문 방범창 / 저층 침입 경로 점검","실외기·가스배관 밟고 오를 곳"],["복도·현관 CCTV·야간 조명",""]]},
+    { id:"room", stage:"① 집 볼 때", field:true, ic:"🛏", ttl:"방·창·채광", type:"check",
+      note:"결로·누수는 가려진 곳에 숨어 있습니다.",
+      items:[["벽지 들뜸·변색·물얼룩 없음","가구·붙박이장·신발장 뒤까지"],["이중창·창틀 실리콘·외풍 확인",""],["낮에 실제 채광 확인","서향=오후 눈부심 / 앞건물 가림 주의"],["벽 기울기·바닥 수평","구축 침하 — 수평계 앱"],["콘센트 위치·개수 (침대·책상 자리)",""],["인터넷 기가 인입·공유기 설치 가능","구축 빌라 안 되는 곳 있음"],["줄자 실측 — 세탁기·냉장고·침대 자리 + 현관·엘베 폭","치수를 아래 ✎에 적어두면 이사 때 편함"]]},
+    { id:"bath", stage:"① 집 볼 때", field:true, ic:"🚽", ttl:"화장실", type:"check",
+      note:"수압·배수는 '동시에' 틀어야 진짜가 드러납니다.",
+      items:[["온수 나오는 속도","오래 걸리면 배관 길거나 보일러 노후"],["동시부하 수압 테스트","세면대+샤워+싱크+변기 동시"],["환풍기 작동 + 곰팡이 없음","창문 없는 욕실 특히"],["배수 경사·역류 냄새","물 받았다 한 번에 빼보기"]]},
+    { id:"kit", stage:"① 집 볼 때", field:true, ic:"🍳", ttl:"주방·설비", type:"check",
+      note:"'리모델링'이 껍데기(도배·장판)인지 배관·전기까지인지 확인.",
+      items:[["싱크대 하부장 누수·곰팡이 없음",""],["보일러 연식 10년 이내","제조년 스티커 사진"],["옵션가전 하나씩 작동","냉장고·세탁기·에어컨 켜보기"],["아침 첫 물 녹물 확인 (노후 건물)","재방문 때"]]},
+    { id:"com", stage:"① 집 볼 때", field:true, ic:"🏢", ttl:"공용부·주차·환경", type:"check",
+      note:"건물 관리 수준 = 벌레·소음·이웃의 바로미터.",
+      items:[["엘리베이터 유무 vs 층수","없는 고층은 장기 후회 1순위"],["택배함·우편함",""],["쓰레기장·복도 청결",""],["1층 음식점/술집 여부","냄새·벌레·밤 소음·불빛"],["주차 — 평일 밤 실제 자리","낮엔 텅 비어도 밤엔 전쟁"]]},
+    { id:"re", stage:"① 집 볼 때", field:true, ic:"🌙", ttl:"재방문 (다른 시간대)", type:"check",
+      note:"급하지 않으니 후보는 시간대 바꿔 두 번 이상.",
+      items:[["밤에 다시 — 소음·불빛·귀갓길 안전",""],["비 온 뒤 — 누수·침수·곰팡이 냄새",""],["주말 — 옆집 생활소음",""]]},
+    { id:"ask", stage:"① 집 볼 때", field:true, ic:"❓", ttl:"물어볼 질문 — 답을 바로 적으세요", type:"ask",
+      note:"중개사·집주인에게 묻고, 답은 각 질문 아래 칸에 바로 기록.",
+      items:[["전 세입자 왜 나가나요?",""],["리모델링 배관·전기까지? 도배·장판만?",""],["관리비 지난달 실제 얼마? 뭐 포함?","월 10만↑ 정액관리비는 세부내역 요구 가능(내 권리)"],["근저당 계약 때까지 안 늘려주실 수 있나?",""],["(다가구) 선순위 보증금 총액? 열람 가능?",""],["옵션 고장 시 수리 책임은?",""]]},
+    { id:"reg", stage:"② 계약 전 확인", ic:"🔎", ttl:"등기부·선순위 확인 (제일 중요)", type:"check",
+      note:"보증금 사고는 대부분 여기서 갈립니다. 계약 전에 꼭.",
+      items:[["등기부등본 떼보기","인터넷등기소 700원 · '집의 빚 명세서'"],["소유자 = 계약할 사람인가 (갑구)",""],["근저당 채권최고액 확인 (을구)","없거나 작을수록 안전"],["을구에 선순위 전세권·임차권등기 없는지","있으면 이미 보증금 사고 난 집일 수 있음"],["가압류·가처분·경매개시·신탁 없음 (갑구)",""],["안심전세앱(HUG)으로 시세·임대인 체납·사고이력 조회","빌라 시세·보증가입 가능여부 원스톱 무료"],["(다가구) 선순위 보증금 총액 확인","주민센터: 전입세대열람+확정일자현황"],["(선순위+모든 보증금) ≤ 시세 70~80% 계산","넘으면 깡통 위험"],["임대인 국세·지방세 미납 확인","납세증명서 요구+미납국세 열람(보증금 천만↑) · 당해세가 내 보증금보다 우선"]]},
+    { id:"loan", stage:"② 계약 전 확인", ic:"💳", ttl:"대출·보증보험 되는 집인지", type:"check",
+      note:"이게 막히면 아무리 좋아도 계약하면 안 됩니다.",
+      items:[["건축물대장 '위반건축물' 아님","정부24 무료 · 있으면 대출·보증 불가"],["(오피스텔) '주택용'인지 + 전입신고 되는지","업무용·전입불가면 대항력·보증 전부 막힘"],["대출 되는 집인지 부동산에 확인","위반건축물X·신탁X·소유자=임대인"],["내 대출상품 자격 확인","카카오 청년 90% 등 (위 💳요약 참고)"],["전세보증보험(HUG/HF) 가입 가능한 집인지","전세가율(집값 대비) 90% 이내여야 가입"],["중개사 정식 등록·공제가입 확인","등록번호를 브이월드/지자체에서 조회"],["(다가구) 방공제로 한도 줄어드는 점 감안",""]]},
+    { id:"flag", stage:"🚩 위험신호 (언제든 발견되면)", field:true, ic:"🚩", ttl:"위험신호 — 발견되면 탈락 검토", type:"flag",
+      note:"체크 = '이 집에서 발견됨'. 하나라도 켜지면 신중히.",
+      items:[["보증금+근저당 > 시세 80% (안전선은 70~80%)",""],["위반건축물·신탁 등기 (대출 원천 불가)",""],["등기부 확인 꺼림 / 근저당 말소 '말로만'",""],["신축빌라 시세 불명 + 전세가만 높음","전세사기 전형"],["다가구 선순위·전입세대 열람 거부",""],["시세보다 이상하게 싼 전세","급매엔 이유가 있다"],["보증금을 소유자 아닌 계좌로 요구",""],["새 도배로 급히 덮은 물얼룩",""]]},
+    { id:"ctr", stage:"③ 계약할 때", ic:"📄", ttl:"계약서·특약·돈", type:"check",
+      note:"돈은 무조건 '등기부상 소유자 본인 계좌'로만.",
+      items:[["계약 상대 = 등기부 소유자 본인, 신분증 대조",""],["실소유자 본인 계약인지 (전대차 아님)","세입자가 몰래 재임대하는 집 주의 · 전대면 소유자 동의서 필수"],["대리인이면 위임장+인감증명서+소유자 유선확인",""],["계약금은 소유자 본인 명의 계좌로 송금","통상 보증금의 10% · 영수증 받기"],["특약: 잔금 다음날까지 근저당 등 추가설정 금지","대항력은 전입 다음날 0시 발생 → 그 하루 공백 막는 방패"],["특약: 대출/보증보험 미승인 시 계약 무효·전액 반환",""],["특약: 계약일 현재 미납 국세·지방세 없음(있으면 잔금 전 완납)",""],["특약: 하자·수선은 임대인 책임 + 원상복구는 자연마모 제외","퇴거 때 '이거 물어내라' 분쟁 예방"],["전 세입자 관리비·공과금 미납 승계 없음 확인",""],["(근저당 있으면) 특약: 잔금일에 근저당 말소",""],["중개보수 상한요율 확인 (지자체 고시)","전세 구간별 법정 상한 있음"],["중개대상물 확인설명서 + 공제증서 받기","중개사 필수 교부 서류"]]},
+    { id:"key", stage:"④ 잔금·입주 당일 (가장 중요)", ic:"🔑", ttl:"잔금·전입신고·확정일자", type:"check",
+      note:"이 하루가 보증금을 지키는 핵심. 순서대로 하세요.",
+      items:[["잔금 전 아침에 등기부 다시 열람","밤새 근저당 안 생겼나 확인"],["입주 전 집 상태 사진·영상 채증 (날짜 나오게)","벽·바닥·창틀·가전 전부 — 퇴거 분쟁의 유일한 증거 · 위 📷에 올려두면 됨"],["잔금은 소유자 명의 계좌로, 영수증",""],["이사(짐 넣기)로 '점유' 시작",""],["그날 바로 전입신고","주민센터 또는 정부24"],["그날 바로 확정일자 받기","계약서에 · 전입신고와 함께"],["30일 내 전월세신고 (정부24)","보증금 6천↑/월세30↑ 의무 · 2025.6부터 지연 과태료 · 신고 시 확정일자 자동부여"],["전기·가스·수도 검침값 확인 + 관리소·집주인 연락처 저장","이전 사용분 정산 분쟁 방지"],["도어락 비밀번호 교체",""],["(대출이면) 대출 실행·질권설정 확인",""]]},
+    { id:"after", stage:"⑤ 입주 후 (보증금 지키기)", ic:"✅", ttl:"보증금 지키기", type:"check",
+      note:"여기까지 하면 2년 마음 편합니다.",
+      items:[["전세보증보험(반환보증) 가입","HUG/HF/SGI · ★계약기간 1/2 지나기 전 신청(넘기면 가입 불가)"],["계약서·확정일자·영수증·보증서 사진 보관",""],["전입신고 유지 — 중간에 주소 옮기지 말기","옮기면 대항력 사라짐"],["관리비·공과금 자동이체 설정",""],["만기 6~2개월 전 갱신/퇴거 의사 통지","계속 살려면 계약갱신청구권(2+2년·인상 5% 상한) 행사 가능"],["[만기] 보증금 못 받으면 이사 전 임차권등기명령","등기 확인 후 이사 — 안 그러면 대항력 소멸"],["(아파트면) 퇴거 시 장기수선충당금 반환 청구","관리비로 낸 것, 집주인 부담분"]]}
+  ];
+
+  /* ===== state & helpers ===== */
+  var state = { uid: null, props: [], curId: null, photos: [] };
+  var $ = function (id) { return document.getElementById(id); };
+  function cur() { for (var i=0;i<state.props.length;i++) if (state.props[i].id===state.curId) return state.props[i]; return null; }
+  function itemId(sec, i) { return sec.id + "." + i; }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) {
+    return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[m]; }); }
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); });
+  }
+
+  var toastEl = $("toast"), tTimer;
+  function toast(msg) { toastEl.textContent = msg; toastEl.classList.add("show"); clearTimeout(tTimer);
+    tTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2000); }
+  function flashToast(msg) { toastEl.textContent = msg || "저장됨"; toastEl.classList.add("show");
+    clearTimeout(tTimer); tTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 850); }
+
+  /* ===== theme / offline / field-mode ===== */
+  var root = document.documentElement;
+  $("themeBtn").addEventListener("click", function () {
+    var now = root.getAttribute("data-theme");
+    var isDark = now ? now === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.setAttribute("data-theme", isDark ? "light" : "dark");
+  });
+
+  function setOffline(off) { document.body.classList.toggle("off", off); }
+  window.addEventListener("offline", function () { setOffline(true); });
+  window.addEventListener("online", function () { setOffline(false); flushAll(); });
+  setOffline(!navigator.onLine);
+
+  var fieldMode = false;
+  try { fieldMode = localStorage.getItem("jib.field") === "1"; } catch (e) {}
+  function applyFieldMode() {
+    document.body.classList.toggle("field", fieldMode);
+    var b = $("fieldBtn"); b.setAttribute("aria-pressed", String(fieldMode));
+    if (fieldMode) SECTIONS.forEach(function (s) { if (s.field) openSet[s.id] = true; });
+    renderSections(); updateSummary();
+  }
+  $("fieldBtn").addEventListener("click", function () {
+    fieldMode = !fieldMode;
+    try { localStorage.setItem("jib.field", fieldMode ? "1" : "0"); } catch (e) {}
+    applyFieldMode();
+    flashToast(fieldMode ? "현장 모드 — 집볼때+위험신호만" : "전체 보기");
+  });
+
+  /* ===== AUTH ===== */
+  var lastUid = "__init__";
+  async function gate() {
+    var s = await sb.auth.getSession();
+    var uid = s.data.session ? s.data.session.user.id : null;
+    if (uid === lastUid) return;
+    lastUid = uid;
+    if (uid) {
+      state.uid = uid;
+      $("authView").style.display = "none";
+      $("appView").style.display = "";
+      $("userLabel").textContent = (s.data.session.user.email || "로그인됨") + " · 동기화됨";
+      applyFieldMode();
+      await loadProps();
+    } else {
+      state.uid = null; state.props = []; state.curId = null;
+      $("appView").style.display = "none";
+      $("authView").style.display = "";
+    }
+  }
+  sb.auth.onAuthStateChange(function () { gate(); });
+
+  function authMsg(t, ok) { var e = $("authMsg"); e.textContent = t || ""; e.className = "auth-msg" + (ok ? " ok" : ""); }
+  function setAuthBusy(b) { $("loginBtn").disabled = b; $("signupBtn").disabled = b; }
+  $("loginBtn").addEventListener("click", async function () {
+    var email = $("email").value.trim(), pw = $("pw").value;
+    if (!email || !pw) { authMsg("이메일과 비밀번호를 입력하세요."); return; }
+    setAuthBusy(true); authMsg("로그인 중…", true);
+    var r = await sb.auth.signInWithPassword({ email: email, password: pw });
+    setAuthBusy(false);
+    if (r.error) authMsg("로그인 실패: " + friendlyAuth(r.error.message)); else authMsg("");
+  });
+  $("signupBtn").addEventListener("click", async function () {
+    var email = $("email").value.trim(), pw = $("pw").value;
+    if (!email || pw.length < 6) { authMsg("비밀번호는 6자 이상이어야 해요."); return; }
+    setAuthBusy(true); authMsg("가입 중…", true);
+    var r = await sb.auth.signUp({ email: email, password: pw });
+    setAuthBusy(false);
+    if (r.error) { authMsg("가입 실패: " + friendlyAuth(r.error.message)); return; }
+    if (r.data.session) authMsg("가입 완료! 들어가는 중…", true);
+    else authMsg("가입됨. 이메일의 인증 링크를 누른 뒤 로그인하세요.", true);
+  });
+  $("pw").addEventListener("keydown", function (e) { if (e.key === "Enter") $("loginBtn").click(); });
+  $("logoutBtn").addEventListener("click", async function () { flushAll(); await sb.auth.signOut(); });
+  function friendlyAuth(m) {
+    if (/Invalid login/i.test(m)) return "이메일 또는 비밀번호가 틀렸어요.";
+    if (/already registered/i.test(m)) return "이미 가입된 이메일이에요. '로그인'을 누르세요.";
+    if (/Email not confirmed/i.test(m)) return "이메일 인증이 필요해요(메일 링크 확인).";
+    if (/signups not allowed/i.test(m)) return "신규 가입이 닫혀 있어요.";
+    return m;
+  }
+
+  /* ===== SAVE (pending 병합 — 유실 방지) ===== */
+  var saveTimers = {}, pending = {};
+  function queueSave(patch) {
+    var id = state.curId, c = cur(); if (!c || !id) return;
+    for (var k in patch) c[k] = patch[k];
+    pending[id] = Object.assign(pending[id] || {}, patch);
+    clearTimeout(saveTimers[id]);
+    saveTimers[id] = setTimeout(function () { flushSave(id); }, 400);
+  }
+  async function flushSave(id) {
+    var body = pending[id]; if (!body) return;
+    delete pending[id];
+    body.updated_at = new Date().toISOString();
+    var r = await sb.from("properties").update(body).eq("id", id);
+    if (r.error) {
+      pending[id] = Object.assign(body, pending[id] || {});
+      toast("저장 실패 — 연결되면 자동 재시도");
+      clearTimeout(saveTimers[id]);
+      saveTimers[id] = setTimeout(function () { flushSave(id); }, 4000);
+    } else flashToast("저장됨");
+  }
+  function flushAll() {
+    for (var id in pending) { clearTimeout(saveTimers[id]); flushSave(id); }
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") flushAll();
+    else if (state.uid && photosLoadedAt && Date.now() - photosLoadedAt > 6 * 3600 * 1000) loadPhotos();
+  });
+  window.addEventListener("pagehide", flushAll);
+
+  /* ===== DATA: properties ===== */
+  async function loadProps() {
+    $("sections").innerHTML = '<div class="loading">불러오는 중…</div>';
+    var r = await sb.from("properties").select("*").order("sort", { ascending: true }).order("created_at", { ascending: true });
+    if (r.error) {
+      $("sections").innerHTML = '<div class="loading">불러오기 실패 — 연결을 확인하세요<br><br><button class="btn" id="retryBtn" style="max-width:200px;margin:0 auto">다시 시도</button></div>';
+      $("retryBtn").addEventListener("click", loadProps);
+      return;
+    }
+    state.props = r.data || [];
+    if (!state.props.length) { await addProp("매물 1", true); return; }
+    if (!cur()) state.curId = state.props[0].id;
+    renderAll();
+    await loadPhotos();
+  }
+  async function addProp(name, silent) {
+    var r = await sb.from("properties").insert({ name: name, checks: {}, notes: {}, sort: state.props.length }).select().single();
+    if (r.error) { toast("추가 실패: " + r.error.message); return; }
+    state.props.push(r.data); state.curId = r.data.id;
+    renderAll(); await loadPhotos(); if (!silent) flashToast("매물 추가됨");
+  }
+  async function delProp() {
+    var id = state.curId;
+    clearTimeout(saveTimers[id]); delete pending[id];
+    var ph = await sb.from("photos").select("path").eq("property_id", id);
+    if (ph.data && ph.data.length) { await sb.storage.from(BUCKET).remove(ph.data.map(function (x) { return x.path; })); }
+    var r = await sb.from("properties").delete().eq("id", id);
+    if (r.error) { toast("삭제 실패: " + r.error.message); return; }
+    state.props = state.props.filter(function (p) { return p.id !== id; });
+    if (!state.props.length) { await addProp("매물 1", true); return; }
+    state.curId = state.props[0].id; renderAll(); await loadPhotos();
+  }
+
+  /* ===== DATA: photos ===== */
+  var photosSeq = 0, photosLoadedAt = 0;
+  function compressImage(file, maxDim, quality) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var w = img.naturalWidth, h = img.naturalHeight, m = Math.max(w, h);
+        if (m > maxDim) { var r = maxDim / m; w = Math.round(w * r); h = Math.round(h * r); }
+        var c = document.createElement("canvas"); c.width = w; c.height = h;
+        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        c.toBlob(function (b) { b ? resolve(b) : reject(new Error("압축 실패")); }, "image/jpeg", quality);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("이미지 열기 실패 (HEIC는 PC 크롬에서 안 될 수 있어요)")); };
+      img.src = url;
+    });
+  }
+  async function loadPhotos() {
+    var seq = ++photosSeq, pid = state.curId;
+    if (!pid) { state.photos = []; renderPhotos(); return; }
+    var r = await sb.from("photos").select("*").eq("property_id", pid).order("created_at", { ascending: true });
+    if (seq !== photosSeq) return;
+    if (r.error) { state.photos = []; renderPhotos(); return; }
+    var list = r.data || [];
+    list.forEach(function (x) { x.url = ""; });
+    if (list.length) {
+      var s = await sb.storage.from(BUCKET).createSignedUrls(list.map(function (x) { return x.path; }), 28800);
+      if (seq !== photosSeq) return;
+      if (s.data) s.data.forEach(function (u, i) { if (list[i]) list[i].url = u.signedUrl || ""; });
+    }
+    state.photos = list; photosLoadedAt = Date.now(); renderPhotos();
+  }
+  function renderPhotos() {
+    var grid = $("phGrid"); grid.innerHTML = "";
+    state.photos.forEach(function (p) {
+      var d = document.createElement("div"); d.className = "ph-item";
+      var im = document.createElement("img"); im.src = p.url; im.alt = "매물 사진"; im.loading = "lazy";
+      var del = document.createElement("button"); del.className = "del"; del.title = "삭제";
+      del.setAttribute("aria-label", "사진 삭제"); del.textContent = "✕";
+      im.addEventListener("click", function () { openLightbox(p.url); });
+      del.addEventListener("click", function (e) { e.stopPropagation(); confirmDeletePhoto(p); });
+      d.appendChild(im); d.appendChild(del); grid.appendChild(d);
+    });
+    var add = document.createElement("button"); add.className = "ph-add"; add.type = "button";
+    add.innerHTML = '<span class="plus">＋</span><span>사진 추가</span>';
+    add.addEventListener("click", function () { $("phInput").click(); });
+    grid.appendChild(add);
+  }
+  $("phInput").addEventListener("change", async function (e) {
+    var files = Array.prototype.slice.call(e.target.files || []); e.target.value = "";
+    var pid = state.curId, ownerUid = state.uid;
+    if (!files.length || !pid || !ownerUid) return;
+    var grid = $("phGrid");
+    var busy = document.createElement("div"); busy.className = "ph-busy"; busy.textContent = "사진 올리는 중…";
+    grid.parentNode.insertBefore(busy, grid.nextSibling);
+    var ok = 0, fail = 0;
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i]; if (!/^image\//.test(f.type)) { fail++; continue; }
+      busy.textContent = "사진 올리는 중… (" + (i + 1) + "/" + files.length + ")";
+      try {
+        var blob = await compressImage(f, 1400, 0.72);
+        var path = ownerUid + "/" + pid + "/" + uuid() + ".jpg";
+        var up = await sb.storage.from(BUCKET).upload(path, blob, { contentType: "image/jpeg" });
+        if (up.error) throw up.error;
+        var ins = await sb.from("photos").insert({ property_id: pid, path: path });
+        if (ins.error) throw ins.error;
+        ok++;
+      } catch (err) { fail++; }
+    }
+    if (busy.parentNode) busy.parentNode.removeChild(busy);
+    if (state.curId === pid) await loadPhotos();
+    toast(ok + "장 저장됨" + (fail ? " · " + fail + "장 실패" : ""));
+  });
+  function confirmDeletePhoto(p) {
+    openSheet('<h3>사진 삭제</h3><p>이 사진을 지울까요? 되돌릴 수 없어요.</p>' +
+      '<div class="actions"><button class="btn" id="cB">취소</button><button class="btn danger" id="dB">삭제</button></div>');
+    $("cB").onclick = closeSheet;
+    $("dB").onclick = async function () {
+      closeSheet();
+      await sb.storage.from(BUCKET).remove([p.path]);
+      await sb.from("photos").delete().eq("id", p.id);
+      await loadPhotos(); flashToast("삭제됨");
+    };
+  }
+  function openLightbox(url) { openSheet('<img class="lightbox" src="' + esc(url) + '" alt="매물 사진">'); }
+
+  /* ===== RENDER: sections ===== */
+  var elSections = $("sections"), openSet = {};
+  var noteTimers = {};
+  function saveNote(id, val) {
+    var c = cur(); if (!c) return;
+    if (!c.notes) c.notes = {};
+    if (val) c.notes[id] = val; else delete c.notes[id];
+    clearTimeout(noteTimers[id]);
+    noteTimers[id] = setTimeout(function () { queueSave({ notes: c.notes }); }, 500);
+  }
+  function makeNoteInput(id, val, placeholder) {
+    var ta = document.createElement("textarea");
+    ta.className = "note-in"; ta.rows = 1; ta.value = val || "";
+    ta.placeholder = placeholder || "메모…";
+    ta.addEventListener("click", function (e) { e.stopPropagation(); });
+    ta.addEventListener("input", function () {
+      ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px";
+      saveNote(id, ta.value.trim());
+    });
+    return ta;
+  }
+  function renderSections() {
+    var c = cur(); elSections.innerHTML = ""; var lastStage = null;
+    SECTIONS.forEach(function (sec) {
+      if (fieldMode && !sec.field) return;
+      if (sec.stage && sec.stage !== lastStage) {
+        lastStage = sec.stage;
+        var div = document.createElement("div");
+        div.className = "stage" + (sec.type === "flag" ? " risk" : "");
+        div.innerHTML = '<span class="t">' + sec.stage + '</span><span class="ln"></span>';
+        elSections.appendChild(div);
+      }
+      var checks = (c && c.checks) || {};
+      var notes = (c && c.notes) || {};
+      var done = 0; sec.items.forEach(function (_, i) { if (checks[itemId(sec, i)]) done++; });
+      var isFlag = sec.type === "flag", isAsk = sec.type === "ask";
+      var open = fieldMode ? true : openSet[sec.id];
+      var wrap = document.createElement("section"); wrap.className = "section" + (open ? " open" : "");
+      var head = document.createElement("div");
+      head.className = "sec-head"; head.setAttribute("role", "button"); head.tabIndex = 0;
+      var cntCls = isFlag ? (done > 0 ? "cnt flagged" : "cnt") : (done === sec.items.length ? "cnt full" : "cnt");
+      var cntTxt = isFlag ? (done > 0 ? done + " 발견" : "0") : done + "/" + sec.items.length;
+      head.innerHTML = '<span class="ic">' + sec.ic + '</span><span class="ttl">' + sec.ttl + '</span>' +
+        '<span class="' + cntCls + '">' + cntTxt + '</span>' +
+        '<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>';
+      head.addEventListener("click", function () { openSet[sec.id] = !wrap.classList.contains("open"); wrap.classList.toggle("open"); });
+      head.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); head.click(); } });
+      wrap.appendChild(head);
+      var body = document.createElement("div"); body.className = "sec-body";
+      if (sec.note) { var n = document.createElement("div"); n.className = "sec-note"; n.textContent = sec.note; body.appendChild(n); }
+      sec.items.forEach(function (it, i) {
+        var id = itemId(sec, i), on = !!checks[id], noteVal = notes[id] || "";
+        var item = document.createElement("div");
+        item.className = "item" + (isFlag ? " flag" : "") + (on ? " on" : "");
+        var row = document.createElement("div"); row.className = "item-row";
+        row.innerHTML = '<span class="box"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span>' +
+          '<span class="txt">' + esc(it[0]) + (it[1] ? '<span class="hint">' + esc(it[1]) + '</span>' : '') + '</span>';
+        var noteRow = document.createElement("div"); noteRow.className = "note-row";
+        if (isAsk) {
+          noteRow.appendChild(makeNoteInput(id, noteVal, "답변을 여기 적으세요…"));
+        } else {
+          var nb = document.createElement("button");
+          nb.className = "note-btn" + (noteVal ? " has" : ""); nb.type = "button";
+          nb.title = "메모"; nb.setAttribute("aria-label", "이 항목에 메모");
+          nb.textContent = "✎";
+          nb.addEventListener("click", function (e) {
+            e.stopPropagation();
+            if (!noteRow.firstChild) {
+              var ta = makeNoteInput(id, (cur() && cur().notes && cur().notes[id]) || "", "이 항목 메모…");
+              noteRow.appendChild(ta); ta.focus();
+            } else if (!noteRow.firstChild.value) {
+              noteRow.innerHTML = "";
+            } else { noteRow.firstChild.focus(); }
+          });
+          row.appendChild(nb);
+          if (noteVal) noteRow.appendChild(makeNoteInput(id, noteVal, "이 항목 메모…"));
+        }
+        row.addEventListener("click", function (e) {
+          if (e.target.closest(".note-btn") || e.target.closest(".note-in")) return;
+          var cc = cur(); if (!cc) return; if (!cc.checks) cc.checks = {};
+          if (cc.checks[id]) delete cc.checks[id]; else cc.checks[id] = 1;
+          item.classList.toggle("on");
+          updateHeadCount(head, sec); updateSummary(); queueSave({ checks: cc.checks });
+        });
+        item.appendChild(row);
+        item.appendChild(noteRow);
+        body.appendChild(item);
+      });
+      wrap.appendChild(body); elSections.appendChild(wrap);
+    });
+    document.querySelectorAll(".note-in").forEach(function (ta) {
+      ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px";
+    });
+  }
+  function updateHeadCount(head, sec) {
+    var checks = (cur() && cur().checks) || {}, done = 0;
+    sec.items.forEach(function (_, i) { if (checks[itemId(sec, i)]) done++; });
+    var badge = head.querySelector(".cnt"), isFlag = sec.type === "flag";
+    if (isFlag) { badge.className = "cnt" + (done > 0 ? " flagged" : ""); badge.textContent = done > 0 ? done + " 발견" : "0"; }
+    else { badge.className = "cnt" + (done === sec.items.length ? " full" : ""); badge.textContent = done + "/" + sec.items.length; }
+  }
+  function updateSummary() {
+    var c = cur(), checks = (c && c.checks) || {}, done = 0, total = 0, flags = 0;
+    SECTIONS.forEach(function (sec) {
+      sec.items.forEach(function (_, i) {
+        var on = !!checks[itemId(sec, i)];
+        if (sec.type === "flag") { if (on) flags++; } else { total++; if (on) done++; }
+      });
+    });
+    $("sDone").textContent = done + "/" + total;
+    $("sFlag").textContent = flags;
+    $("sFlagWrap").className = "stat flag" + (flags === 0 ? " clear" : "");
+    var al = $("alert");
+    if (flags > 0) { al.classList.add("show"); $("alertTxt").textContent = "위험신호 " + flags + "개 발견 — 계약 전 반드시 확인·재검토"; }
+    else al.classList.remove("show");
+    document.querySelectorAll("#rating button").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(!!c && b.dataset.r === c.rating));
+    });
+  }
+
+  /* ===== property switch / rating / memo ===== */
+  var elSel = $("propSel");
+  function ratingIcon(r) { return r === "후보" ? "👍" : r === "보류" ? "🤔" : r === "탈락" ? "👎" : ""; }
+  function renderSelect() {
+    elSel.innerHTML = "";
+    state.props.forEach(function (p, i) {
+      var o = document.createElement("option");
+      o.value = p.id;
+      var ic = ratingIcon(p.rating);
+      o.textContent = (ic ? ic + " " : "") + (p.name || ("매물 " + (i + 1)));
+      if (p.id === state.curId) o.selected = true; elSel.appendChild(o);
+    });
+  }
+  elSel.addEventListener("change", async function () { state.curId = elSel.value; renderAll(); await loadPhotos(); });
+  $("rating").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return; var c = cur(); if (!c) return;
+    var v = (c.rating === b.dataset.r) ? "" : b.dataset.r;
+    queueSave({ rating: v }); updateSummary(); renderSelect();
+  });
+  var memoEl = $("memo"), mTimer;
+  memoEl.addEventListener("input", function () {
+    clearTimeout(mTimer); mTimer = setTimeout(function () { queueSave({ memo: memoEl.value }); }, 500);
+  });
+
+  /* ===== modal ===== */
+  var overlay = $("overlay"), sheet = $("sheet");
+  function openSheet(html) { sheet.innerHTML = html; overlay.classList.add("show"); }
+  function closeSheet() { overlay.classList.remove("show"); sheet.innerHTML = ""; }
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) closeSheet(); });
+
+  function askName(title, sub, initial, onOk) {
+    openSheet('<h3>' + esc(title) + '</h3><p>' + esc(sub) + '</p>' +
+      '<input id="nmIn" type="text" placeholder="예) 장안동 다가구 2억">' +
+      '<div class="actions"><button class="btn" id="cB">취소</button><button class="btn primary" id="okB">확인</button></div>');
+    var inp = $("nmIn"); inp.value = initial || ""; inp.focus();
+    $("cB").onclick = closeSheet;
+    function go() { var v = inp.value.trim(); if (!v) { inp.focus(); return; } closeSheet(); onOk(v); }
+    $("okB").onclick = go;
+    inp.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
+  }
+  $("addBtn").addEventListener("click", function () {
+    askName("새 매물 추가", "이 매물만의 이름/주소를 적어두면 나중에 비교하기 좋아요.", "", function (name) { addProp(name); });
+  });
+  $("resetBtn").addEventListener("click", function () {
+    var c = cur(); if (!c) return;
+    openSheet('<h3>체크 초기화</h3><p>"' + esc(c.name || "매물") + '"의 체크·판정이 모두 지워집니다. (사진·메모는 유지)</p>' +
+      '<div class="actions"><button class="btn" id="cB">취소</button><button class="btn danger" id="rB">초기화</button></div>');
+    $("cB").onclick = closeSheet;
+    $("rB").onclick = function () {
+      closeSheet();
+      c.checks = {}; queueSave({ checks: {}, rating: "" });
+      renderAll(); flashToast("초기화됨");
+    };
+  });
+  $("delBtn").addEventListener("click", function () {
+    var c = cur(); if (!c) return;
+    openSheet('<h3>이 매물 삭제</h3><p>"' + esc(c.name || "매물") + '"의 체크·메모·사진이 모두 지워집니다. 되돌릴 수 없어요.</p>' +
+      '<div class="actions"><button class="btn" id="cB">취소</button><button class="btn danger" id="dB">삭제</button></div>');
+    $("cB").onclick = closeSheet;
+    $("dB").onclick = async function () { closeSheet(); await delProp(); flashToast("삭제됨"); };
+  });
+  $("cmpBtn").addEventListener("click", function () {
+    var rows = state.props.map(function (p, i) {
+      var checks = p.checks || {}, done = 0, total = 0, flags = 0;
+      SECTIONS.forEach(function (sec) {
+        sec.items.forEach(function (_, j) {
+          var on = !!checks[sec.id + "." + j];
+          if (sec.type === "flag") { if (on) flags++; } else { total++; if (on) done++; }
+        });
+      });
+      var rt = ratingIcon(p.rating) || "·";
+      return '<div class="cmp-card' + (p.id === state.curId ? " active" : "") + '" data-id="' + esc(p.id) + '">' +
+        '<span class="rt">' + rt + '</span><span class="nm">' + esc(p.name || ("매물 " + (i + 1))) + '</span>' +
+        '<span class="pill g">' + done + "/" + total + '</span>' +
+        '<span class="pill ' + (flags ? "d" : "g") + '">⚠ ' + flags + '</span></div>';
+    }).join("");
+    openSheet('<h3>매물 비교</h3><p>확인 완료 / ⚠ 위험신호 · 탭하면 그 매물로 이동</p><div class="cmp-list">' + rows + '</div>' +
+      '<div class="actions" style="margin-top:14px"><button class="btn" id="cB">닫기</button>' +
+      '<button class="btn primary" id="rnB">현재 매물 이름변경</button></div>');
+    $("cB").onclick = closeSheet;
+    $("rnB").onclick = function () {
+      closeSheet();
+      askName("이름 변경", "현재 매물의 이름을 바꿉니다.", (cur() || {}).name, function (v) {
+        queueSave({ name: v }); renderSelect(); flashToast("변경됨");
+      });
+    };
+    sheet.querySelectorAll(".cmp-card").forEach(function (card) {
+      card.addEventListener("click", async function () { state.curId = card.dataset.id; closeSheet(); renderAll(); await loadPhotos(); });
+    });
+  });
+
+  function renderAll() { renderSelect(); renderSections(); memoEl.value = (cur() || {}).memo || ""; updateSummary(); }
+
+  /* ===== SW ===== */
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "127.0.0.1" || location.hostname === "localhost")) {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  }
+
+  /* ===== boot ===== */
+  gate();
+})();
+</script>
+</body>
+</html>

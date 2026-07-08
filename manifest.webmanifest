@@ -1,0 +1,14 @@
+{
+  "name": "집보기 체크앱",
+  "short_name": "집보기",
+  "description": "전세 첫 계약 5단계 체크 — 매물·사진·기록 동기화",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#2f5bd0",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
