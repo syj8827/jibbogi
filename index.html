@@ -170,6 +170,12 @@
     font-size: 13.5px; font-weight: 650; cursor: pointer; font-family: var(--font); position: relative; }
   .chip::after { content: ""; position: absolute; inset: -3px; }
   .chip[aria-pressed="true"] { border-color: var(--warn); background: var(--warn-soft); color: var(--warn-strong); }
+  /* select 화살표 — 다크에서 보이도록 오버라이드 */
+  @media (prefers-color-scheme: dark) {
+    select.prop { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%239aa4b3' stroke-width='2.2' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>"); }
+  }
+  :root[data-theme="dark"] select.prop { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%239aa4b3' stroke-width='2.2' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>"); }
+  :root[data-theme="light"] select.prop { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%235a6474' stroke-width='2.2' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>"); }
 
   /* compact header on scroll */
   body.compact .summary, body.compact .eyebrow, body.compact .gauge, body.compact .next-chip { display: none; }
@@ -783,6 +789,7 @@
   }
   try { var tv = localStorage.getItem("jib.theme"); if (tv) root.setAttribute("data-theme", tv); } catch (e) {}
   applyThemeColor();
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyThemeColor); } catch (e) {}
   $("themeBtn").addEventListener("click", function () {
     var now = root.getAttribute("data-theme");
     var isDark = now ? now === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
@@ -836,7 +843,7 @@
       '<div class="actions" style="margin-top:10px"><button class="btn" id="skipPr">나중에</button></div>');
     $("skipPr").onclick = closeSheet;
     sheet.querySelectorAll("[data-pr]").forEach(function (b) {
-      b.addEventListener("click", function () { closeSheet(); setRating(b.dataset.pr); });
+      b.addEventListener("click", function () { closeSheet(); tryRating(b.dataset.pr); });
     });
   }
 
@@ -871,6 +878,10 @@
     var uid = s.data.session ? s.data.session.user.id : null;
     if (uid === lastUid) return;
     lastUid = uid;
+    /* 계정 전환/로그아웃 시 이전 계정의 pending·타이머 완전 초기화 (교차 오염 방지) */
+    for (var tk in saveTimers) clearTimeout(saveTimers[tk]);
+    for (var nk in noteTimers) clearTimeout(noteTimers[nk]);
+    pending = {}; inflight = {}; retryDelay = {}; failToasted = false;
     if (uid) {
       state.uid = uid;
       $("authView").style.display = "none";
@@ -879,6 +890,9 @@
       restorePending();
       applyFieldMode();
       await loadProps();
+      /* 내 소유가 아닌(삭제된) 매물의 pending 폐기 */
+      for (var pid in pending) { if (!state.props.some(function (p) { return p.id === pid; })) delete pending[pid]; }
+      mirrorPending();
       flushAll();
     } else {
       state.uid = null; state.props = []; state.curId = null;
@@ -932,12 +946,14 @@
     else authMsg("재설정 메일을 보냈어요. 메일함(스팸함도)을 확인하세요.", true);
   });
   $("logoutBtn").addEventListener("click", async function () {
-    flushAll();
-    for (var id in saveTimers) clearTimeout(saveTimers[id]);
+    /* 마지막 편집이 서버에 실리도록 최대 2.5초 대기 후 로그아웃 */
+    var jobs = Object.keys(pending).map(function (id) { clearTimeout(saveTimers[id]); return flushSave(id); });
     for (var nid in noteTimers) clearTimeout(noteTimers[nid]);
+    await Promise.race([Promise.all(jobs), new Promise(function (r) { setTimeout(r, 2500); })]);
     await sb.auth.signOut();
   });
   function friendlyAuth(m) {
+    if (!navigator.onLine || /fetch|network|load failed/i.test(m)) return "인터넷 연결이 없어요 — 연결된 뒤 다시 시도하세요.";
     if (/Invalid login/i.test(m)) return "이메일 또는 비밀번호가 틀렸어요. 잊었다면 '비밀번호를 잊었나요?'를 누르세요.";
     if (/already registered/i.test(m)) return "이미 가입된 이메일이에요. '로그인'을 누르세요.";
     if (/Email not confirmed/i.test(m)) return "이메일 인증이 필요해요(메일 링크 확인).";
@@ -952,7 +968,10 @@
   function restorePending() {
     try {
       var v = JSON.parse(localStorage.getItem(pendKey()) || "{}");
-      for (var id in v) pending[id] = Object.assign(v[id], pending[id] || {});
+      for (var id in v) {
+        if (v[id] && v[id].checks) { var ck = v[id].checks; for (var k in ck) { if (ck[k] === "ok") ck[k] = 1; } }
+        pending[id] = Object.assign(v[id], pending[id] || {});
+      }
     } catch (e) {}
   }
   function queueSaveFor(pid, patch) {
@@ -976,7 +995,11 @@
     var send = Object.assign({}, snap); send.updated_at = new Date().toISOString();
     var r = await sb.from("properties").update(send).eq("id", pid).select("id");
     delete inflight[pid];
-    if (r.error || !r.data || !r.data.length) {
+    if (!r.error && (!r.data || !r.data.length)) {
+      /* 행이 없음(다른 기기에서 삭제/권한 없음) — 재시도 무의미, 폐기 */
+      delete pending[pid]; delete retryDelay[pid]; mirrorPending(); return;
+    }
+    if (r.error) {
       if (!failToasted) { failToasted = true; toast("아직 저장 대기 중 — 연결되면 자동 저장돼요"); }
       retryDelay[pid] = Math.min((retryDelay[pid] || 2000) * 2, 30000);
       clearTimeout(saveTimers[pid]);
@@ -1081,7 +1104,10 @@
     if (!pid) { state.photos = []; renderPhotos(); return; }
     var r = await sb.from("photos").select("*").eq("property_id", pid).order("created_at", { ascending: true });
     if (seq !== photosSeq) return;
-    if (r.error) { state.photos = []; renderPhotos(); return; }
+    if (r.error) {
+      if (pid === state.curId && state.photos.length) { toast("사진 목록 새로고침 실패 — 이전 목록 유지"); return; }
+      state.photos = []; renderPhotos(); return;
+    }
     var list = r.data || [];
     list.forEach(function (x) { x.url = ""; });
     if (list.length) {
@@ -1115,12 +1141,13 @@
     if (!navigator.onLine) { toast("오프라인 — 연결된 뒤에 사진을 올려주세요"); return; }
     if (!state.photos.length) toast("팁: 건물 외관+호수 표지판부터 찍으면 사진이 안 섞여요");
     var grid = $("phGrid");
-    var busy = document.createElement("div"); busy.className = "ph-busy"; busy.textContent = "사진 올리는 중…";
+    var pname = (cur() || {}).name || "매물";
+    var busy = document.createElement("div"); busy.className = "ph-busy"; busy.textContent = '"' + pname + '" 사진 올리는 중…';
     grid.parentNode.insertBefore(busy, grid.nextSibling);
     var ok = 0, fail = 0;
     for (var i = 0; i < files.length; i++) {
       var f = files[i]; if (!/^image\//.test(f.type)) { fail++; continue; }
-      busy.textContent = "사진 올리는 중… (" + (i + 1) + "/" + files.length + ")";
+      busy.textContent = '"' + pname + '" 사진 올리는 중… (' + (i + 1) + "/" + files.length + ")";
       try {
         var blob = await compressImage(f, 1400, 0.72);
         var path = ownerUid + "/" + pid + "/" + uuid() + ".jpg";
@@ -1133,7 +1160,7 @@
     }
     if (busy.parentNode) busy.parentNode.removeChild(busy);
     if (state.curId === pid) await loadPhotos();
-    toast(ok + "장 저장됨" + (fail ? " · " + fail + "장 실패" : ""));
+    toast('"' + pname + '"에 ' + ok + "장 저장됨" + (fail ? " · " + fail + "장 실패" : ""));
   }
   $("phInput").addEventListener("change", function (e) {
     var files = Array.prototype.slice.call(e.target.files || []); e.target.value = "";
@@ -1191,7 +1218,9 @@
       var pid = state.curId;
       if (!c.notes) c.notes = {};
       var f = c.notes._facts || (c.notes._facts = {});
-      f[inp.dataset.f] = inp.value.replace(/[^\d.]/g, "");
+      var fv = inp.value.replace(/[^\d.]/g, "");
+      if (fv !== inp.value) inp.value = fv; /* '2억' 같은 문자 입력 시 화면·저장값 불일치 방지 */
+      f[inp.dataset.f] = fv;
       var d = document.querySelector('#facts .fmt[data-fmt="' + inp.dataset.f + '"]');
       if (d) {
         var v = num(f[inp.dataset.f]);
@@ -1226,26 +1255,30 @@
     var g = gaugeData(cur()), el = $("gauge");
     if (!g || fieldMode) { el.classList.remove("show"); return; }
     el.classList.add("show");
-    var incomplete = g.reasons.length > 0, cls, badgeTxt, badgeCls, pctTxt, cta = "";
+    var incomplete = g.reasons.length > 0, cls, badgeTxt, badgeCls, pctTxt, cta = "", ariaTxt;
     /* 안전 우선: 미확인값은 전부 낙관치(실제는 더 나쁠 수만 있음) → 낙관치가 이미 위험선이면 무조건 빨강 */
-    if (g.rate > 80) {
-      cls = "bad"; badgeCls = "g-badge pill d"; pctTxt = (incomplete ? "~" : "") + g.rate + "%";
+    if (g.rate >= 80) {
+      cls = "bad"; badgeCls = "g-badge pill d"; pctTxt = (incomplete ? "≥" : "") + g.rate + "%";
       badgeTxt = g.rate > 90 ? "보증보험 불가선 초과" : "깡통 위험";
       if (incomplete) badgeTxt += " · 실제론 더 나쁠 수 있음";
+      ariaTxt = "전세가율 " + (incomplete ? "최소 " : "") + g.rate + "퍼센트, " + badgeTxt;
     } else if (incomplete) {
-      cls = "n"; badgeCls = "g-badge pill n q"; pctTxt = "?%";
+      cls = "n"; badgeCls = "g-badge pill n q"; pctTxt = "≥" + g.rate + "%";
       if (!g.verified) { badgeTxt = "시세 확인 전 · 판단 불가"; cta = "→ 안심전세앱(HUG)에서 시세 확인 후, 아래 '시세 출처'를 바꾸면 판정이 켜져요"; }
       else if (g.reasons.indexOf("lien") >= 0) { badgeTxt = "근저당 미확인 · 잠정"; cta = "→ 등기부 을구의 근저당을 입력하면 확정돼요 (없으면 0 입력)"; }
-      else { badgeTxt = "선순위 미확인 · 잠정"; cta = "→ 다가구(또는 유형 모름)는 선순위 보증금 확인 전엔 판정 불가"; }
-    } else if (g.rate > 70) { cls = "warn"; badgeCls = "g-badge pill w"; badgeTxt = "주의 구간"; pctTxt = g.rate + "%"; }
-    else { cls = "ok"; badgeCls = "g-badge pill g"; badgeTxt = "안심 구간"; pctTxt = g.rate + "%"; }
+      else if (g.btype === "") { badgeTxt = "건물 유형 미선택 · 잠정"; cta = "→ 위 💰에서 건물 유형부터 고르세요 — 다세대·오피스텔·아파트면 바로 판정돼요"; }
+      else if (g.btype === "모름") { badgeTxt = "유형 확인 필요 · 잠정"; cta = "→ 중개사에게 다가구/다세대 여부 확인 — 다가구면 선순위 보증금까지"; }
+      else { badgeTxt = "선순위 미확인 · 잠정"; cta = "→ 다가구는 선순위 보증금 확인 전엔 판정 불가 (주민센터 열람)"; }
+      ariaTxt = "전세가율 최소 " + g.rate + "퍼센트, " + badgeTxt;
+    } else if (g.rate > 70) { cls = "warn"; badgeCls = "g-badge pill w"; badgeTxt = "주의 구간"; pctTxt = g.rate + "%"; ariaTxt = "전세가율 " + g.rate + "퍼센트, 주의 구간"; }
+    else { cls = "ok"; badgeCls = "g-badge pill g"; badgeTxt = "안심 구간"; pctTxt = g.rate + "%"; ariaTxt = "전세가율 " + g.rate + "퍼센트, 안심 구간"; }
     $("gPct").textContent = pctTxt;
     $("gPct").className = "g-pct g-" + cls;
     $("gFill").style.width = Math.min(g.rate, 100) + "%";
     $("gFill").className = "g-fill bg-" + cls;
     $("gBadge").textContent = badgeTxt; $("gBadge").className = badgeCls;
     $("gCta").textContent = cta;
-    el.setAttribute("aria-label", "전세가율 " + (incomplete ? "약 " : "") + g.rate + "퍼센트, " + badgeTxt + ", 눌러서 상세 보기");
+    el.setAttribute("aria-label", ariaTxt + ", 눌러서 상세 보기");
     var lines = ["물린 돈 " + esc(manwon(g.d + g.l + g.s)) + " (보증금 " + esc(manwon(g.d)) +
       (g.l ? " + 근저당 " + esc(manwon(g.l)) : "") + (g.s ? " + 선순위 " + esc(manwon(g.s)) : "") +
       ") ÷ 시세 " + esc(manwon(g.pr)) + " = <b>" + (incomplete ? "약 " : "") + g.rate + "%</b>",
@@ -1347,7 +1380,11 @@
       head.addEventListener("click", function () {
         openSet[sec.id] = !wrap.classList.contains("open");
         wrap.classList.toggle("open");
-        head.setAttribute("aria-expanded", String(wrap.classList.contains("open")));
+        var nowOpen = wrap.classList.contains("open");
+        head.setAttribute("aria-expanded", String(nowOpen));
+        if (nowOpen) { /* 닫힌 상태에서 만들어진 메모칸 높이 재계산 */
+          wrap.querySelectorAll(".note-in").forEach(function (ta) { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; });
+        }
       });
       head.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); head.click(); } });
       wrap.appendChild(head);
@@ -1546,27 +1583,34 @@
     queueSave({ rating: v }); updateSummary(); renderSelect();
     flashToast(v ? "판정: " + v : "판정 해제");
   }
+  function tryRating(v) { /* 후보 가드레일 — 헤더 버튼·현장 판정시트 공용 */
+    var c = cur(); if (!c) return;
+    if (v !== "후보") { setRating(v); return; }
+    var st = statsOf(c, false);
+    var g = gaugeData(c);
+    var warns = [];
+    if (st.flags > 0) warns = warns.concat(st.flagNames.map(function (n) { return "🚩 " + n; }));
+    if (g && g.rate >= 80) warns.push("📉 전세가율 " + (g.reasons.length ? "약 " : "") + g.rate + "% — 깡통 위험선");
+    if (!g) warns.push("💰 보증금·시세 미입력 — 전세가율도 모른 채 후보 지정");
+    else {
+      if (!g.verified) warns.push("🔍 시세 미확인 — 안심전세앱(HUG)으로 확인 후 후보 권장");
+      if (g.reasons.indexOf("lien") >= 0) warns.push("📋 근저당 미확인 — 등기부 을구 확인 전");
+      if (g.reasons.indexOf("senior") >= 0) warns.push("🏢 선순위 보증금 미확인 (다가구/유형미정)");
+    }
+    if (warns.length) {
+      openSheet('<h3>⚠ 이 집, 그래도 후보로 할까요?</h3><p>다음 신호가 켜져 있어요:</p>' +
+        '<ul class="flaglist">' + warns.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + '</ul>' +
+        '<div class="actions"><button class="btn" id="noB">다시 볼래요</button><button class="btn primary" id="yesB">그래도 후보로</button></div>');
+      $("noB").onclick = closeSheet;
+      $("yesB").onclick = function () { closeSheet(); setRating("후보"); };
+      return;
+    }
+    setRating("후보");
+  }
   $("rating").addEventListener("click", function (e) {
     var b = e.target.closest("button"); if (!b) return; var c = cur(); if (!c) return;
     var v = (c.rating === b.dataset.r) ? "" : b.dataset.r;
-    if (v === "후보") {
-      var st = statsOf(c, false);
-      var g = gaugeData(c);
-      var warns = [];
-      if (st.flags > 0) warns = warns.concat(st.flagNames.map(function (n) { return "🚩 " + n; }));
-      if (g && g.rate > 80) warns.push("📉 전세가율 " + (g.reasons.length ? "약 " : "") + g.rate + "% — 깡통 위험선 초과");
-      if (!g) warns.push("💰 보증금·시세 미입력 — 전세가율도 모른 채 후보 지정");
-      else if (!g.verified) warns.push("🔍 시세 미확인 — 안심전세앱(HUG)으로 확인 후 후보 권장");
-      if (warns.length) {
-        openSheet('<h3>⚠ 이 집, 그래도 후보로 할까요?</h3><p>다음 신호가 켜져 있어요:</p>' +
-          '<ul class="flaglist">' + warns.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + '</ul>' +
-          '<div class="actions"><button class="btn" id="noB">다시 볼래요</button><button class="btn primary" id="yesB">그래도 후보로</button></div>');
-        $("noB").onclick = closeSheet;
-        $("yesB").onclick = function () { closeSheet(); setRating("후보"); };
-        return;
-      }
-    }
-    setRating(v);
+    tryRating(v);
   });
 
   /* ===== property select / memo ===== */
@@ -1667,8 +1711,9 @@
       var ob = order[b.rating] !== undefined ? order[b.rating] : 2;
       if (oa !== ob) return oa - ob;
       var ga = gaugeData(a), gb = gaugeData(b);
-      var ra = (ga && ga.verified && !ga.reasons.length) ? ga.rate : 999;
-      var rb = (gb && gb.verified && !gb.reasons.length) ? gb.rate : 999;
+      /* 미확인은 뒤로, 단 '미확인+이미 위험선'은 그냥 미확인보다도 아래 */
+      function rk(g) { if (!g) return 999; if (g.verified && !g.reasons.length) return g.rate; return g.rate >= 80 ? 900 + g.rate : 500; }
+      var ra = rk(ga), rb = rk(gb);
       if (ra !== rb) return ra - rb;
       return statsOf(a, false).flags - statsOf(b, false).flags;
     });
@@ -1688,8 +1733,10 @@
       if (num(f.deposit)) pills += '<span class="pill n">' + esc(manwon(num(f.deposit))) + '</span>';
       if (g) {
         var vok = g.verified && !g.reasons.length;
-        var cls = !vok ? "n q" : g.rate <= 70 ? "g" : g.rate <= 80 ? "w" : "d";
-        pills += '<span class="pill ' + cls + '">' + g.rate + "%" + (!vok ? " 미확인" : "") +
+        /* 게이지와 동일한 안전역전: 낙관치가 이미 80% 이상이면 미확인이어도 빨강 */
+        var cls = g.rate >= 80 ? "d" : !vok ? "n q" : g.rate <= 70 ? "g" : "w";
+        var ptxt = (!vok ? "≥" : "") + g.rate + "%" + (!vok ? (g.rate >= 80 ? " 미확인·위험" : " 미확인") : "");
+        pills += '<span class="pill ' + cls + '">' + ptxt +
           (vok && st.flags === 0 && bestRate === g.rate && state.props.length > 1 ? " ✦" : "") + '</span>';
       }
       pills += '<span class="pill ' + (st.flags ? "d" : "g") + '">⚠' + st.flags + '</span>';
@@ -1704,7 +1751,7 @@
         '<div class="cmp-sub">' + sub.join(" · ") + '</div></div>';
     }).join("");
     var hasCandidate = state.props.some(function (p) { return p.rating === "후보"; });
-    openSheet('<h3>매물 비교</h3><p>좋은 순 정렬 · ✦=검증 시세 중 가장 안전(위험신호 0) · 점선 회색=시세 미확인 · 탭=이동</p><div class="cmp-list">' + rows + '</div>' +
+    openSheet('<h3>매물 비교</h3><p>좋은 순 정렬 · ✦=검증 시세 중 가장 안전(위험신호 0) · 점선 회색=시세 미확인 · 빨강=미확인이어도 이미 위험선 · 탭=이동</p><div class="cmp-list">' + rows + '</div>' +
       '<div class="actions" style="margin-top:14px">' +
       '<button class="btn" id="cB">닫기</button>' +
       (hasCandidate ? '<button class="btn primary" id="goRegB">👍 후보 → ② 등기부 확인 시작</button>' : '') +
